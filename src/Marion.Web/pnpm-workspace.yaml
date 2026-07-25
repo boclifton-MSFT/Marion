@@ -1,0 +1,78 @@
+shamefullyHoist: true
+
+minimumReleaseAgeExclude:
+  - '@tiptap/core@3.29.0'
+  - '@tiptap/extension-blockquote@3.29.0'
+  - '@tiptap/extension-bold@3.29.0'
+  - '@tiptap/extension-bubble-menu@3.29.0'
+  - '@tiptap/extension-bullet-list@3.29.0'
+  - '@tiptap/extension-code@3.29.0'
+  - '@tiptap/extension-code-block@3.29.0'
+  - '@tiptap/extension-collaboration@3.29.0'
+  - '@tiptap/extension-document@3.29.0'
+  - '@tiptap/extension-drag-handle@3.29.0'
+  - '@tiptap/extension-drag-handle-vue-3@3.29.0'
+  - '@tiptap/extension-dropcursor@3.29.0'
+  - '@tiptap/extension-floating-menu@3.29.0'
+  - '@tiptap/extension-gapcursor@3.29.0'
+  - '@tiptap/extension-hard-break@3.29.0'
+  - '@tiptap/extension-heading@3.29.0'
+  - '@tiptap/extension-horizontal-rule@3.29.0'
+  - '@tiptap/extension-image@3.29.0'
+  - '@tiptap/extension-italic@3.29.0'
+  - '@tiptap/extension-link@3.29.0'
+  - '@tiptap/extension-list@3.29.0'
+  - '@tiptap/extension-list-item@3.29.0'
+  - '@tiptap/extension-list-keymap@3.29.0'
+  - '@tiptap/extension-mention@3.29.0'
+  - '@tiptap/extension-node-range@3.29.0'
+  - '@tiptap/extension-ordered-list@3.29.0'
+  - '@tiptap/extension-paragraph@3.29.0'
+  - '@tiptap/extension-placeholder@3.29.0'
+  - '@tiptap/extension-strike@3.29.0'
+  - '@tiptap/extension-text@3.29.0'
+  - '@tiptap/extension-underline@3.29.0'
+  - '@tiptap/extensions@3.29.0'
+  - '@tiptap/markdown@3.29.0'
+  - '@tiptap/pm@3.29.0'
+  - '@tiptap/starter-kit@3.29.0'
+  - '@tiptap/suggestion@3.29.0'
+  - '@tiptap/vue-3@3.29.0'
+  - '@takumi-rs/core@2.5.0'
+  - brace-expansion@5.0.8
+  - eslint@10.8.0
+  - lodash@4.18.1
+  - minimatch@10.2.5
+  - sharp@0.35.3
+  - tar@7.5.22
+  - '@takumi-rs/core-darwin-arm64@2.5.0'
+  - '@takumi-rs/core-darwin-x64@2.5.0'
+  - '@takumi-rs/core-linux-arm64-gnu@2.5.0'
+  - '@takumi-rs/core-linux-arm64-musl@2.5.0'
+  - '@takumi-rs/core-linux-x64-gnu@2.5.0'
+  - '@takumi-rs/core-linux-x64-musl@2.5.0'
+  - '@takumi-rs/core-win32-arm64-msvc@2.5.0'
+  - '@takumi-rs/core-win32-x64-msvc@2.5.0'
+  - '@takumi-rs/helpers@2.5.0'
+
+overrides:
+  brace-expansion: 5.0.8
+  'lodash@4': 4.18.1
+  minimatch: 10.2.5
+  'nuxt-component-meta@0.18.0>oxc-parser': 0.141.0
+  'nuxt-component-meta@0.18.0>unplugin': 3.3.0
+  sharp: 0.35.3
+  'tar@7': 7.5.22
+
+peerDependencyRules:
+  allowedVersions:
+    '@bomb.sh/tab>cac': ^7.0.0
+
+allowBuilds:
+  '@parcel/watcher': false
+  '@tailwindcss/oxide': false
+  better-sqlite3: true
+  esbuild: false
+  sharp: true
+  unrs-resolver: false
+  vue-demi: false

@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "src/Marion.AppHost/Marion.AppHost.csproj"
+  }
+}

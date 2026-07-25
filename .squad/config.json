@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "agentModelOverrides": {
+    "scribe": "gpt-5.6-luna"
+  },
+  "agentReasoningEffortOverrides": {
+    "scribe": "low"
+  }
+}

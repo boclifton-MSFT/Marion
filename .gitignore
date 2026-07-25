@@ -1,0 +1,289 @@
+# =============================================================================
+# Marion
+# =============================================================================
+
+# =============================================================================
+# .NET / C#
+# =============================================================================
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+**/packages/*
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# StyleCop
+StyleCopReport.xml
+
+# Files built by Visual Studio
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Chutzpah Test files
+_Chutzpah*
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Visual Studio Trace Files
+*.e2e
+
+# Test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# NUnit
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+
+# Build Results of an ATL Project
+[Dd]ebugPublic/
+[Rr]eleasePublic/
+[Rr]eleases/
+
+# Benchmark Results
+BenchmarkDotNet.Artifacts/
+
+# .NET publish output
+publish/
+
+# .NET tool configuration
+.config
+
+# User Secrets (keep the ID in csproj, ignore actual secrets)
+secrets.json
+
+# =============================================================================
+# Node.js / pnpm / Nuxt
+# =============================================================================
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Nuxt build output
+.nuxt/
+.output/
+dist/
+
+# Nuxt Content cache
+.data/
+
+# Nitro
+.nitro/
+
+# Nuxt generate
+.generate/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+*.local
+
+# Vite
+*.local
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Nuxt telemetry
+.nuxtrc
+
+# =============================================================================
+# OS Generated Files
+# =============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# IDE / Editor Specific
+# =============================================================================
+
+# JetBrains (WebStorm, Rider, etc.)
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+
+# Certificates
+*.pfx
+*.p12
+*.cer
+
+# Azure
+appsettings.Production.json
+azure-pipelines-*.yml.user
+
+# Docker
+.docker/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Aspire
+.aspire/
+aspire-manifest.json
+
+# Local development overrides
+*.local.json
+local.settings.json
+# Squad: ignore runtime state (logs, inbox, sessions)
+# Note: .squad/casting/* is identity and MUST be committed to main, not ignored
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+.squad/.scratch/
+.squad/.cache/
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream

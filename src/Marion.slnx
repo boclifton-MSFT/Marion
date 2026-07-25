@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Marion.ApiService/Marion.ApiService.csproj" />
+  <Project Path="Marion.AppHost/Marion.AppHost.csproj" />
+  <Project Path="Marion.ServiceDefaults/Marion.ServiceDefaults.csproj" />
+</Solution>

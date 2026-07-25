@@ -1,0 +1,53 @@
+{
+  "agents": {
+    "stewie": {
+      "persistent_name": "Stewie",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "brian": {
+      "persistent_name": "Brian",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "lois": {
+      "persistent_name": "Lois",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "joe": {
+      "persistent_name": "Joe",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "cleveland": {
+      "persistent_name": "Cleveland",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "mort": {
+      "persistent_name": "Mort",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "tom": {
+      "persistent_name": "Tom",
+      "universe": "Family Guy",
+      "created_at": "2026-07-25T11:40:40.578-05:00",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

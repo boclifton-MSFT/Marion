@@ -1,0 +1,100 @@
+title: Close more loans with [AI-powered clarity]{class="text-primary"}
+description: Marion understands the loan origination process, keeps every file moving, and gives loan officers the context and automation they need to close faster.
+seo:
+  title: Marion | AI-powered loan officer assistant
+  description: Automate loan origination workflows, understand every file, and help loan officers close more loans faster with Marion.
+navigation: false
+hero:
+  links:
+    - label: Get started
+      icon: i-lucide-arrow-right
+      trailing: true
+      to: /login
+      size: xl
+    - label: View the code
+      icon: i-simple-icons-github
+      size: xl
+      color: neutral
+      variant: subtle
+      to: https://github.com/boclifton-MSFT/Marion
+      target: _blank
+sections:
+  - title: One intelligent view of every loan
+    description: Marion brings documents, borrower details, milestones, and open conditions together so the next action is always clear.
+    id: workflow
+    orientation: horizontal
+    features:
+      - name: Complete file comprehension
+        description: Understand application data and supporting documents without manually piecing the story together.
+        icon: i-lucide-files
+      - name: Proactive next actions
+        description: Surface missing information, blockers, and time-sensitive follow-ups before they slow the loan down.
+        icon: i-lucide-list-checks
+      - name: Workflow automation
+        description: Automate repeatable origination tasks while keeping loan officers in control of important decisions.
+        icon: i-lucide-workflow
+  - title: Built for the way loan officers work
+    description: Marion augments the existing origination process with practical AI assistance instead of adding another disconnected system.
+    orientation: horizontal
+    reverse: true
+    features:
+      - name: Borrower-ready communication
+        description: Draft clear, contextual updates and requests using the latest information in the loan file.
+        icon: i-lucide-message-square-text
+      - name: Risk and exception awareness
+        description: Highlight inconsistencies and unresolved conditions early enough for the team to act.
+        icon: i-lucide-shield-alert
+      - name: End-to-end context
+        description: Keep the full history and current status available from intake through closing.
+        icon: i-lucide-route
+features:
+  title: AI superpowers for the origination team
+  description: Marion focuses AI on the work that consumes time, fragments attention, and delays closings.
+  items:
+    - title: Document intelligence
+      description: Extract, connect, and summarize the information that matters across the loan file.
+      icon: i-lucide-file-search
+    - title: Pipeline prioritization
+      description: Focus attention on the loans and actions most likely to affect near-term closings.
+      icon: i-lucide-gauge
+    - title: Automated follow-up
+      description: Keep borrowers and partners moving with timely, context-aware requests and updates.
+      icon: i-lucide-send
+    - title: Condition tracking
+      description: Turn outstanding requirements into an actionable, continuously updated plan.
+      icon: i-lucide-clipboard-check
+    - title: Decision support
+      description: Bring relevant context and potential issues forward without replacing human judgment.
+      icon: i-lucide-brain-circuit
+    - title: Operational visibility
+      description: Give loan officers and leaders a shared understanding of progress, risk, and throughput.
+      icon: i-lucide-chart-no-axes-combined
+testimonials:
+  headline: Designed around the loan team
+  title: Useful context for every role
+  description: A shared source of truth helps the entire origination team coordinate without losing momentum.
+  items:
+    - quote: Start each day with the loans, borrowers, and follow-ups that need attention now.
+      user:
+        name: Loan officers
+        description: Prioritize and act
+    - quote: See missing documents, unresolved conditions, and dependencies without reconstructing the file.
+      user:
+        name: Processors
+        description: Keep files complete
+    - quote: Understand pipeline health and emerging bottlenecks while there is still time to respond.
+      user:
+        name: Branch leaders
+        description: Improve throughput
+cta:
+  title: Move every loan forward with confidence
+  description: Give your team the context, automation, and AI assistance to spend more time with borrowers and less time chasing the file.
+  links:
+    - label: Sign in
+      to: /login
+      trailingIcon: i-lucide-arrow-right
+    - label: View on GitHub
+      to: https://github.com/boclifton-MSFT/Marion
+      target: _blank
+      variant: subtle
+      icon: i-simple-icons-github
