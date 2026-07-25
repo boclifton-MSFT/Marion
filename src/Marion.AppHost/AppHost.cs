@@ -7,11 +7,10 @@ var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
 
 var frontend = builder.AddViteApp("frontend", "../Marion.Web")
     .WithPnpm()
-    .WithHttpsEndpoint(env: "PORT")
-    .WithHttpsDeveloperCertificate()
+    .WithHttpEndpoint(env: "PORT")
     .WithExternalHttpEndpoints()
     .WithReference(apiService)
     .WaitFor(apiService)
-    .WithEnvironment("NUXT_PUBLIC_API_BASE", apiService.GetEndpoint("https"));
+    .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"));
 
 builder.Build().Run();
