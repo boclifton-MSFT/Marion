@@ -39,3 +39,10 @@
 **What:** For .NET 10 Minimal APIs using `AddOpenApi()` and `MapOpenApi()`, do not call obsolete `WithOpenApi()`. Express endpoint OpenAPI metadata with supported conventions such as `WithName`, `WithSummary`, `WithDescription`, and `Produces`.
 
 **Why:** `WithOpenApi()` is deprecated in ASP.NET Core and the native endpoint metadata conventions continue to supply the existing OpenAPI behavior.
+### 2026-07-25T12:03:18.846-05:00: Draft PR first for future issue work
+
+**By:** Bo Clifton (via Squad)
+
+**What:** For future issues, create a draft pull request before beginning implementation; do the work against that draft PR and convert it to non-draft when the work is complete.
+
+**Why:** Keep issue work traceable from the start and make progress visible throughout implementation.
