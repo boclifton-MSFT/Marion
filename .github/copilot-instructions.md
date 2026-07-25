@@ -59,7 +59,7 @@ const { data } = await useAsyncData('items', () => get<Item[]>('/api/items'))
 ### Service Communication
 
 - Services communicate via HTTP with automatic service discovery
-- The frontend receives the API base URL via `NUXT_PUBLIC_API_BASE` environment variable
+- The Nuxt server receives the private API base URL via `NUXT_API_BASE`; browser requests use same-origin `/api` routes
 - Use the `useApi()` composable which handles the base URL configuration
 
 ### Aspire Integration

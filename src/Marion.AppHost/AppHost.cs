@@ -12,6 +12,6 @@ var frontend = builder.AddViteApp("frontend", "../Marion.Web")
     .WithExternalHttpEndpoints()
     .WithReference(apiService)
     .WaitFor(apiService)
-    .WithEnvironment("NUXT_PUBLIC_API_BASE", apiService.GetEndpoint("https"));
+    .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"));
 
 builder.Build().Run();

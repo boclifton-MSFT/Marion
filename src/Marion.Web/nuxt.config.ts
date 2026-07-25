@@ -16,11 +16,10 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    public: {
-      apiBase: process.env.services__apiservice_https_0
-        || process.env.services__apiservice_http_0
-        || 'http://localhost:5000'
-    }
+    apiBase: process.env.NUXT_API_BASE
+      || process.env.services__apiservice_https_0
+      || process.env.services__apiservice_http_0
+      || 'http://localhost:5435'
   },
 
   routeRules: {
