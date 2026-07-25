@@ -24,8 +24,7 @@ internal static class SystemEndpoints
         endpoints.MapGet("/", () => "The Marion API is running.")
             .WithName("GetRoot")
             .WithSummary("Confirms that the Marion API is running.")
-            .Produces<string>(StatusCodes.Status200OK)
-            .WithOpenApi();
+            .Produces<string>(StatusCodes.Status200OK);
 
         endpoints.MapGet("/api/system/info", (IHostEnvironment environment) =>
             new SystemInfoResponse(
@@ -37,8 +36,7 @@ internal static class SystemEndpoints
             .WithName("GetSystemInfo")
             .WithSummary("Returns safe application and build metadata.")
             .WithDescription("Returns application metadata without configuration values, credentials, or internal infrastructure details.")
-            .Produces<SystemInfoResponse>(StatusCodes.Status200OK)
-            .WithOpenApi();
+            .Produces<SystemInfoResponse>(StatusCodes.Status200OK);
 
         endpoints.MapGet("/api/system/dependencies", async (
             HealthCheckService healthCheckService,
@@ -57,8 +55,7 @@ internal static class SystemEndpoints
             .WithName("GetSystemDependencies")
             .WithSummary("Returns the health state of application dependencies.")
             .WithDescription("Returns logical dependency names and safe health states without diagnostic details or exception data.")
-            .Produces<SystemDependenciesResponse>(StatusCodes.Status200OK)
-            .WithOpenApi();
+            .Produces<SystemDependenciesResponse>(StatusCodes.Status200OK);
     }
 
     private static string GetApplicationVersion()
