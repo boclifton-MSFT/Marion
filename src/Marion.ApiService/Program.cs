@@ -5,7 +5,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.AddSqlServerDbContext<MarionDbContext>("mariondb");
+builder.AddSqlServerDbContext<MarionDbContext>(
+    "mariondb",
+    settings => settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing"));
 
 // Add services to the container.
 builder.Services.AddProblemDetails();

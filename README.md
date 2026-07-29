@@ -61,7 +61,7 @@ The AppHost models the SQL Server resource as `sql` and its application database
 
 The API does not run migrations during startup and currently defines no mortgage-domain schema. SQL connectivity is included in `/health` readiness checks; `/alive` remains a process-only liveness check. The safe `/api/system/dependencies` response exposes only logical health states and never connection details.
 
-Fast API tests generate unique database configuration and disable external SQL connectivity through test-only settings. Aspire functional tests remove the development volume and persistent lifetime from their in-memory resource model before startup, then validate real SQL connectivity with session-scoped state.
+Tests generate unique database configuration and disable the external SQL connectivity check under the `Testing` environment, keeping test state isolated from persistent development data.
 
 ### Future Azure SQL configuration
 

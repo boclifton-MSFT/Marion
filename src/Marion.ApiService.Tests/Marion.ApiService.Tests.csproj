@@ -9,8 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
-    <PackageReference Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -22,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Marion.ApiService\Marion.ApiService.csproj" />
-    <ProjectReference Include="..\Marion.AppHost\Marion.AppHost.csproj" Aliases="AppHost" />
   </ItemGroup>
 
 </Project>

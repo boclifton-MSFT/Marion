@@ -1,6 +1,5 @@
 using Marion.ApiService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -24,9 +23,7 @@ public sealed class PersistenceRegistrationTests : IClassFixture<MarionApiFactor
         using var dbContext = scope.ServiceProvider.GetRequiredService<MarionDbContext>();
 
         Assert.Equal("Microsoft.EntityFrameworkCore.SqlServer", dbContext.Database.ProviderName);
-        Assert.False(dbContext.GetService<IDbContextOptions>()
-            .FindExtension<CoreOptionsExtension>()?
-            .IsSensitiveDataLoggingEnabled);
+        Assert.Equal(factory.DatabaseName, dbContext.Database.GetDbConnection().Database);
     }
 
     [Fact]

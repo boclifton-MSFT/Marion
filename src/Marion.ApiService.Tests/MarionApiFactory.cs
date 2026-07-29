@@ -6,21 +6,16 @@ namespace Marion.ApiService.Tests;
 
 public sealed class MarionApiFactory : WebApplicationFactory<Program>
 {
-    private const string SqlServerSettingsPath =
-        "Aspire:Microsoft:EntityFrameworkCore:SqlServer:MarionDbContext";
-
-    private readonly bool disableHealthChecks;
     private readonly string environmentName;
 
     public MarionApiFactory()
-        : this("Testing", disableHealthChecks: true)
+        : this("Testing")
     {
     }
 
-    internal MarionApiFactory(string environmentName, bool disableHealthChecks = false)
+    internal MarionApiFactory(string environmentName)
     {
         this.environmentName = environmentName;
-        this.disableHealthChecks = disableHealthChecks;
     }
 
     public string DatabaseName { get; } = $"marion-test-{Guid.NewGuid():N}";
@@ -32,16 +27,10 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
             DataSource = Guid.NewGuid().ToString("N"),
             InitialCatalog = DatabaseName,
             IntegratedSecurity = true,
-            Encrypt = true,
-            ConnectTimeout = 1,
-            Pooling = false
+            Encrypt = true
         }.ConnectionString;
 
         builder.UseEnvironment(environmentName);
         builder.UseSetting("ConnectionStrings:mariondb", connectionString);
-        builder.UseSetting(
-            $"{SqlServerSettingsPath}:DisableHealthChecks",
-            disableHealthChecks.ToString());
-        builder.UseSetting($"{SqlServerSettingsPath}:MaxRetryCount", "0");
     }
 }

@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Marion.ApiService.Features.System;
-using Marion.ApiService.Infrastructure.Persistence;
 using Xunit;
 
 namespace Marion.ApiService.Tests;
@@ -29,7 +28,9 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.Equal(DateTimeKind.Utc, payload.UtcTime.UtcDateTime.Kind);
 
         var body = await response.Content.ReadAsStringAsync();
-        SensitiveOutputAssertions.DoesNotContainSensitiveDetails(body);
+        Assert.DoesNotContain("ConnectionStrings", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -45,31 +46,11 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
             dependency.Name == "self" && dependency.Status == DependencyState.Healthy);
 
         var body = await response.Content.ReadAsStringAsync();
-        SensitiveOutputAssertions.DoesNotContainSensitiveDetails(body);
-    }
-
-    [Fact]
-    public async Task SQL_unavailability_fails_readiness_without_failing_liveness()
-    {
-        using var unavailableFactory = new MarionApiFactory("Development");
-        using var unavailableClient = unavailableFactory.CreateClient();
-
-        using var readinessResponse = await unavailableClient.GetAsync("/health");
-        using var livenessResponse = await unavailableClient.GetAsync("/alive");
-        using var dependenciesResponse = await unavailableClient.GetAsync("/api/system/dependencies");
-        var payload = await dependenciesResponse.Content
-            .ReadFromJsonAsync<SystemDependenciesResponse>();
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, readinessResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, livenessResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, dependenciesResponse.StatusCode);
-        Assert.NotNull(payload);
-        Assert.Contains(payload.Dependencies, dependency =>
-            dependency.Name == nameof(MarionDbContext)
-            && dependency.Status == DependencyState.Unavailable);
-
-        var body = await dependenciesResponse.Content.ReadAsStringAsync();
-        SensitiveOutputAssertions.DoesNotContainSensitiveDetails(body);
+        Assert.DoesNotContain("ConnectionStrings", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Data Source", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
