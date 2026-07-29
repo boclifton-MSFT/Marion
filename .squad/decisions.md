@@ -31,3 +31,18 @@
 **What:** Keep `Marion.ApiService` as the only backend application project. Move the starter-owned `/` and `/weatherforecast` endpoints, their static data, and the `WeatherForecast` response record into `Features/System/SystemEndpoints.cs`, exposed through one internal `MapSystemEndpoints(IEndpointRouteBuilder)` extension. Keep `Program.cs` as the composition root for Aspire ServiceDefaults, Problem Details, OpenAPI, middleware, feature mapping, and default health endpoints. Treat `Infrastructure/Configuration`, `Infrastructure/Identity`, `Infrastructure/Persistence`, `Infrastructure/Storage`, `Infrastructure/Messaging`, `Infrastructure/Health`, and `Common` as reserved locations that are created only when concrete implementations need them; do not add empty folders, interfaces, registration methods, or projects.
 
 **Why:** This establishes a clear vertical-feature boundary and a concise composition root while preserving the current API, Aspire observability, health checks, nullable settings, and build graph. It avoids a ceremonial Clean Architecture split and leaves future infrastructure concerns discoverable without introducing abstractions before requirements exist.
+
+### 2026-07-25T12:25:30.0966074-05:00: Use native Minimal API metadata instead of `WithOpenApi()`
+
+**By:** Brian
+
+**What:** For .NET 10 Minimal APIs using `AddOpenApi()` and `MapOpenApi()`, do not call obsolete `WithOpenApi()`. Express endpoint OpenAPI metadata with supported conventions such as `WithName`, `WithSummary`, `WithDescription`, and `Produces`.
+
+**Why:** `WithOpenApi()` is deprecated in ASP.NET Core and the native endpoint metadata conventions continue to supply the existing OpenAPI behavior.
+### 2026-07-25T12:03:18.846-05:00: Draft PR first for future issue work
+
+**By:** Bo Clifton (via Squad)
+
+**What:** For future issues, create a draft pull request before beginning implementation; do the work against that draft PR and convert it to non-draft when the work is complete.
+
+**Why:** Keep issue work traceable from the start and make progress visible throughout implementation.

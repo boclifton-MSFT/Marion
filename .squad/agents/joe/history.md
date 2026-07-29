@@ -1,3 +1,5 @@
+📌 Team update (2026-07-25T12:25:30.0966074-05:00): Quality review confirmed removing obsolete `WithOpenApi()` is the correct .NET 10 remediation; optional OpenAPI-document coverage remains non-blocking — decided by Brian and Joe.
+
 # Project Context
 
 - **Project:** Marion, an AI-powered mortgage loan officer assistant

@@ -20,6 +20,9 @@ How to decide who handles what.
 | Session logging | Scribe | Automatic — never needs routing |
 | RAI review | Rai | Content safety, bias checks, credential detection, ethical review |
 | Claim verification & pre-mortems | Fact Checker | Verify APIs, packages, requirements, and architecture assumptions |
+| Bug fixes (isolated, test-covered) | @copilot 🤖 | Single-file fixes, test additions |
+| Documentation updates | @copilot 🤖 | README, API docs, inline comments |
+| Test coverage gaps | @copilot 🤖 | Adding missing test cases |
 
 ## Issue Routing
 

@@ -1,3 +1,5 @@
+📌 Team update (2026-07-25T12:25:30.0966074-05:00): .NET 10 Minimal API endpoint metadata must use native conventions rather than obsolete `WithOpenApi()` — decided by Brian.
+
 # Project Context
 
 - **Project:** Marion, an AI-powered mortgage loan officer assistant

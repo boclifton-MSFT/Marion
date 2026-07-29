@@ -4,13 +4,15 @@ type FetchOptions = NitroFetchOptions<NitroFetchRequest>
 type RequestBody = FetchOptions['body']
 
 export const useApi = () => {
-  const config = useRuntimeConfig()
-  const apiBase = config.public.apiBase
+  const apiBase = '/api'
 
   const apiFetch = async <T>(endpoint: string, options?: FetchOptions): Promise<T> => {
     const url = `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`
-    const response = await $fetch<T>(url, options)
-    return response
+    if (import.meta.server) {
+      return await useRequestFetch()(url, options) as T
+    }
+
+    return await $fetch(url, options) as T
   }
 
   const get = <T>(endpoint: string, options?: Omit<FetchOptions, 'method'>) => {

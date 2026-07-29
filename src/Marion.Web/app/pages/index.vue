@@ -45,6 +45,8 @@
       </UPageGrid>
     </UPageSection>
 
+    <SystemStatus />
+
     <UPageSection
       id="testimonials"
       :headline="page.testimonials.headline"

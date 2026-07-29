@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Check triage script
         id: check-script
@@ -97,12 +99,12 @@ jobs:
             
             core.info(`🔄 Ralph triaged ${results.length} issue(s)`);
 
-      # Copilot auto-assign step (uses PAT if available)
+      # Copilot auto-assign step (the user token is required for coding-agent assignment)
       - name: Ralph — Assign @copilot issues
-        if: success()
+        if: always()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
           script: |
             const fs = require('fs');
 
@@ -140,7 +142,10 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo
               });
+              const baseBranch = repoData.default_branch;
+              core.info(`Using repository default branch "${baseBranch}" for Copilot assignments`);
 
+              let failures = 0;
               for (const issue of unassigned) {
                 try {
                   await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
@@ -150,15 +155,22 @@ jobs:
                     assignees: ['copilot-swe-agent[bot]'],
                     agent_assignment: {
                       target_repo: `${context.repo.owner}/${context.repo.repo}`,
-                      base_branch: repoData.default_branch,
+                      base_branch: baseBranch,
                       custom_instructions: `Read .squad/team.md for team context and .squad/routing.md for routing rules.`
+                    },
+                    headers: {
+                      'X-GitHub-Api-Version': '2022-11-28'
                     }
                   });
                   core.info(`Assigned copilot-swe-agent[bot] to #${issue.number}`);
                 } catch (e) {
+                  failures += 1;
                   core.warning(`Failed to assign @copilot to #${issue.number}: ${e.message}`);
                 }
               }
+              if (failures > 0) {
+                core.setFailed(`Copilot assignment failed for ${failures} issue(s)`);
+              }
             } catch (e) {
-              core.info(`No squad:copilot label found or error: ${e.message}`);
+              core.setFailed(`Could not inspect or assign squad:copilot issues: ${e.message}`);
             }

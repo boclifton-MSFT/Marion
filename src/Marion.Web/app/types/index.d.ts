@@ -13,3 +13,23 @@ export interface BlogPost extends ParsedContent {
     avatar: Avatar
   } & Link)[]
 }
+
+export interface SystemInfoResponse {
+  applicationName: string
+  version: string
+  environment: string
+  buildId?: string | null
+  utcTime: string
+}
+
+export type DependencyState = 'Healthy' | 'Degraded' | 'Unavailable'
+
+export interface SystemDependencyResponse {
+  name: string
+  status: DependencyState
+}
+
+export interface SystemDependenciesResponse {
+  utcTime: string
+  dependencies: SystemDependencyResponse[]
+}
