@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using Marion.ApiService.Features.System;
+using Marion.ApiService.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Xunit;
 
 namespace Marion.ApiService.Tests;
@@ -50,6 +54,39 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.DoesNotContain("Data Source", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(HealthStatus.Degraded, DependencyState.Degraded)]
+    [InlineData(HealthStatus.Unhealthy, DependencyState.Unavailable)]
+    public async Task Dependencies_maps_unhealthy_states_without_exposing_diagnostics(
+        HealthStatus healthStatus,
+        DependencyState expectedState)
+    {
+        using var statusFactory = new MarionApiFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddHealthChecks().AddCheck(
+                    nameof(MarionDbContext),
+                    () => new HealthCheckResult(
+                        healthStatus,
+                        "Data Source=internal;SensitiveValue=not-safe",
+                        new InvalidOperationException("stack and connection details")))));
+        using var statusClient = statusFactory.CreateClient();
+
+        var response = await statusClient.GetAsync("/api/system/dependencies");
+        var payload = await response.Content.ReadFromJsonAsync<SystemDependenciesResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Contains(payload.Dependencies, dependency =>
+            dependency.Name == nameof(MarionDbContext)
+            && dependency.Status == expectedState);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Data Source", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("not-safe", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
     }
 
