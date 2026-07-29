@@ -2,7 +2,15 @@
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+var sql = builder.AddSqlServer("sql")
+    .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var marionDb = sql.AddDatabase("mariondb");
+
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
+    .WithReference(marionDb)
+    .WaitFor(marionDb)
     .WithHttpHealthCheck("/health");
 
 var frontend = builder.AddViteApp("frontend", "../Marion.Web")

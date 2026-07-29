@@ -1,16 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using Marion.ApiService.Features.System;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace Marion.ApiService.Tests;
 
-public sealed class SystemEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
 {
     private readonly HttpClient client;
 
-    public SystemEndpointsTests(WebApplicationFactory<Program> factory)
+    public SystemEndpointsTests(MarionApiFactory factory)
     {
         client = factory.CreateClient();
     }
@@ -47,7 +46,10 @@ public sealed class SystemEndpointsTests : IClassFixture<WebApplicationFactory<P
             dependency.Name == "self" && dependency.Status == DependencyState.Healthy);
 
         var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("ConnectionStrings", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Data Source", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
     }
 
