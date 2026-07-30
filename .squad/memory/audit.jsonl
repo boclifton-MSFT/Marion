@@ -1,0 +1,2 @@
+{"timestamp":"2026-07-25T18:10:31.753Z","action":"search","reason":"Search returned 0 result(s)"}
+{"timestamp":"2026-07-29T20:58:14.704Z","action":"write","id":"f202b11f-9e48-408a-bc6c-a78c634eb574","class":"DECISION","title":"Reconcile issues before dispatch","path":".squad\\decisions\\inbox\\squad-coordinator-reconcile-issues-before-dispatch-f202b11f.md","reason":"Content is allowed for governed local memory","actor":"Squad Coordinator","provider":"local"}

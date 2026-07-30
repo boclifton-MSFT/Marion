@@ -55,3 +55,12 @@
 **What:** PR #23 initially remained blocked because its automated tests did not protect healthy readiness, unavailable/degraded dependency mapping, `/health` failure status, or `/alive` independence. The independent Brian revision added deterministic Aspire SQL health coverage: it verifies healthy readiness and dependency state, stops the real SQL resource, then verifies `/health` returns 503 while `/alive` remains 200 and the dependency endpoint reports `Unavailable` without diagnostics. It also covers Degraded and Unhealthy mapping with bounded timeouts. Joe approved the revised PR after review.
 
 **Why:** The original testing environment disabled the SQL health check and asserted only registration metadata plus the self health entry, leaving a blocking quality gap. The revised deterministic coverage closes that gap without production-behavior, security, schema-invention, or development-topology regressions.
+### 2026-07-25T18-06-01: Use the user token for Copilot assignment workflow chaining
+
+**By:** Cleveland
+
+**What:** Use the user token for Copilot assignment workflow chaining
+
+**References:** .github/workflows/squad-triage.yml, .github/workflows/squad-issue-assign.yml, .github/workflows/squad-heartbeat.yml, .squad/templates/workflows/squad-triage.yml, .squad/templates/workflows/squad-issue-assign.yml, .squad/templates/workflows/squad-heartbeat.yml
+
+**Why:** Use COPILOT_ASSIGN_TOKEN for triage label/comment API calls and for the dedicated Copilot assignment steps. A GITHUB_TOKEN-authored squad:copilot label does not start another workflow, so triage must use the user token to let squad-issue-assign run. Assignment requests must resolve repoData.default_branch at runtime, target copilot-swe-agent[bot] with agent_assignment, and fail visibly instead of falling back to a generic assignee.

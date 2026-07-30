@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "f202b11f-9e48-408a-bc6c-a78c634eb574",
+    "class": "DECISION",
+    "loadGuidance": "ALWAYS",
+    "title": "Reconcile issues before dispatch",
+    "path": ".squad\\decisions\\inbox\\squad-coordinator-reconcile-issues-before-dispatch-f202b11f.md",
+    "status": "active",
+    "createdAt": "2026-07-29T20:58:14.700Z",
+    "updatedAt": "2026-07-29T20:58:14.700Z"
+  }
+]
