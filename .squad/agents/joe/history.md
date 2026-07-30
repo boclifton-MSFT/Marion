@@ -11,3 +11,5 @@
 ## Role Context
 
 Joe owns quality, security, compliance, testing, and release-readiness review.
+
+📌 Team update (2026-07-30T10:41:01.2038306-05:00): Endpoint consumers, request examples, and SQL-readiness assertions were aligned with the stable health JSON contract. Live Aspire verification requires restarting the pre-change running process — identified by Joe.

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Marion.ApiService.Features.System;
 using Marion.ApiService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -55,6 +56,21 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/alive")]
+    public async Task Health_endpoints_return_a_documented_JSON_status(string path)
+    {
+        var response = await client.GetAsync(path);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(JsonValueKind.Object, payload.RootElement.ValueKind);
+        Assert.Single(payload.RootElement.EnumerateObject());
+        Assert.Equal("Healthy", payload.RootElement.GetProperty("status").GetString());
     }
 
     [Theory]

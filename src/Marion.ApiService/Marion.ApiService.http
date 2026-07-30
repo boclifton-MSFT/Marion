@@ -13,9 +13,13 @@ Accept: application/json
 GET {{MarionApi_HostAddress}}/health
 Accept: application/json
 
+# Expected successful response (HTTP 200): { "status": "Healthy" }
+
 ###
 
 GET {{MarionApi_HostAddress}}/alive
 Accept: application/json
+
+# Expected successful response (HTTP 200): { "status": "Healthy" }
 
 ###

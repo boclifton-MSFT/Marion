@@ -2,6 +2,7 @@ extern alias AppHost;
 
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
@@ -41,6 +42,8 @@ public sealed class SqlReadinessIntegrationTests
 
         Assert.Equal(HttpStatusCode.OK, readyResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
+        await AssertHealthyJsonAsync(readyResponse, timeout.Token);
+        await AssertHealthyJsonAsync(liveResponse, timeout.Token);
         Assert.Equal(HttpStatusCode.OK, healthyDependenciesResponse.StatusCode);
         Assert.NotNull(healthyDependencies);
         Assert.Contains(healthyDependencies.Dependencies, dependency =>
@@ -103,5 +106,18 @@ public sealed class SqlReadinessIntegrationTests
         }
 
         return await client.GetAsync(path, cancellationToken);
+    }
+
+    private static async Task AssertHealthyJsonAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+
+        using var payload = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(cancellationToken));
+
+        Assert.Equal(JsonValueKind.Object, payload.RootElement.ValueKind);
+        Assert.Equal("Healthy", payload.RootElement.GetProperty("status").GetString());
     }
 }

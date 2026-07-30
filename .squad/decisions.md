@@ -39,6 +39,7 @@
 **What:** For .NET 10 Minimal APIs using `AddOpenApi()` and `MapOpenApi()`, do not call obsolete `WithOpenApi()`. Express endpoint OpenAPI metadata with supported conventions such as `WithName`, `WithSummary`, `WithDescription`, and `Produces`.
 
 **Why:** `WithOpenApi()` is deprecated in ASP.NET Core and the native endpoint metadata conventions continue to supply the existing OpenAPI behavior.
+
 ### 2026-07-25T12:03:18.846-05:00: Draft PR first for future issue work
 
 **By:** Bo Clifton (via Squad)
@@ -46,3 +47,11 @@
 **What:** For future issues, create a draft pull request before beginning implementation; do the work against that draft PR and convert it to non-draft when the work is complete.
 
 **Why:** Keep issue work traceable from the start and make progress visible throughout implementation.
+
+### 2026-07-30T10:41:01.2038306-05:00: PR #23 health failure semantics quality gate (consolidated)
+
+**By:** Joe
+
+**What:** PR #23 initially remained blocked because its automated tests did not protect healthy readiness, unavailable/degraded dependency mapping, `/health` failure status, or `/alive` independence. The independent Brian revision added deterministic Aspire SQL health coverage: it verifies healthy readiness and dependency state, stops the real SQL resource, then verifies `/health` returns 503 while `/alive` remains 200 and the dependency endpoint reports `Unavailable` without diagnostics. It also covers Degraded and Unhealthy mapping with bounded timeouts. Joe approved the revised PR after review.
+
+**Why:** The original testing environment disabled the SQL health check and asserted only registration metadata plus the self health entry, leaving a blocking quality gap. The revised deterministic coverage closes that gap without production-behavior, security, schema-invention, or development-topology regressions.

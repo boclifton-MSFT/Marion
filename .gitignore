@@ -287,3 +287,6 @@ local.settings.json
 .squad/.cache/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# Reproducible test/build artifacts
+**/.artifacts/
