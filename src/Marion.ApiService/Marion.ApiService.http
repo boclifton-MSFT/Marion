@@ -8,4 +8,32 @@ Accept: application/json
 GET {{MarionApi_HostAddress}}/api/system/dependencies
 Accept: application/json
 
+# Includes logical dependencies such as MarionDbContext and documents.
+# Diagnostic details, URIs, keys, and connection data are never returned.
+
+###
+
+POST {{MarionApi_HostAddress}}/api/system/storage/verify
+Accept: application/json
+
+# Development and IntegrationTesting only.
+# Expected successful response (HTTP 200):
+# { "status": "Healthy", "durationMilliseconds": 0 }
+# The operation uploads, reads, verifies, and deletes unique synthetic content.
+
+###
+
+GET {{MarionApi_HostAddress}}/health
+Accept: application/json
+
+# Expected successful response (HTTP 200): { "status": "Healthy" }
+# Expected dependency failure response (HTTP 503): { "status": "Unhealthy" }
+
+###
+
+GET {{MarionApi_HostAddress}}/alive
+Accept: application/json
+
+# Expected successful response (HTTP 200): { "status": "Healthy" }
+
 ###

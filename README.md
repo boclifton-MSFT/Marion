@@ -16,6 +16,8 @@ The goal is practical: help loan teams spend less time chasing information and m
 
 - .NET 10 and ASP.NET Core
 - Aspire 13.4 for local orchestration, service discovery, health checks, and telemetry
+- SQL Server and Entity Framework Core for relational persistence
+- Azure Blob Storage with Azurite for private document storage
 - Nuxt 4, Vue 3, Nuxt UI, and TypeScript
 - OpenTelemetry for distributed traces, metrics, and logs
 
@@ -39,6 +41,7 @@ The goal is practical: help loan teams spend less time chasing information and m
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
+- A supported container runtime for the local SQL Server and Azurite resources
 - [Node.js](https://nodejs.org/) 22.19 or newer
 - [pnpm](https://pnpm.io/) 11
 
@@ -51,7 +54,31 @@ Set-Location ..\..
 aspire start
 ```
 
-The Aspire CLI prints the authenticated dashboard URL and starts both the API and web application.
+The Aspire CLI prints the authenticated dashboard URL and starts SQL Server, Azurite, the API, and the web application. Local SQL and Blob data use Aspire-managed volumes with persistent container lifetimes so normal development AppHost restarts preserve state.
+
+### Persistence and health
+
+The AppHost models the SQL Server resource as `sql` and its application database as `mariondb`. Aspire supplies the `mariondb` connection string to the API, where `MarionDbContext` is registered through the Aspire Entity Framework Core SQL Server integration.
+
+The API does not run migrations during startup and currently defines no mortgage-domain schema. SQL connectivity is included in `/health` readiness checks; `/alive` remains a process-only liveness check. On success, both health endpoints return HTTP 200 with the stable JSON response `{ "status": "Healthy" }`; consumers must not rely on a raw-text response. The safe `/api/system/dependencies` response exposes only logical health states and never connection details.
+
+Tests generate unique database configuration and disable the external SQL connectivity check under the `Testing` environment, keeping test state isolated from persistent development data.
+
+### Document storage
+
+The AppHost models the Azurite-backed storage account as `storage` and the private Blob container resource as `documents`, whose physical container name is `test-files`. Aspire provisions the container and supplies its connection information only to the API; the Nuxt frontend has no storage reference or storage configuration.
+
+Normal Development runs use an Aspire-managed Azurite data volume and persistent container lifetime. `IntegrationTesting` runs use session lifetime, dynamic ports, no data volume, and no frontend so each test graph is isolated and disposable. Fast API tests disable the external Blob readiness registration and use inert client settings, so they do not require Azurite.
+
+Blob container connectivity is included in `/health` under the logical dependency name `documents` and does not participate in `/alive`. When Blob Storage is unavailable, `/health` returns HTTP 503 with `{ "status": "Unhealthy" }`, `/alive` remains HTTP 200 with `{ "status": "Healthy" }`, and `/api/system/dependencies` remains HTTP 200 with only the safe `Unavailable` state. No URI, key, connection data, or exception details are returned.
+
+Development and IntegrationTesting expose `POST /api/system/storage/verify` for a bounded synthetic upload/read/verify/delete check. It uses unique non-sensitive content, always attempts cleanup, and returns only the outcome and duration. The route is not mapped in Production and must not be used for document-domain data.
+
+For future Azure hosting, keep the `documents` logical connection name and provide a Blob service URI plus the physical container name through Aspire. The Aspire client integration uses the environment's default Azure credential for service-URI connections, preserving a managed-identity path without adding account keys to source. Explicit Azure RBAC and production provisioning belong to the deployment layer.
+
+### Future Azure SQL configuration
+
+Keep the `mariondb` logical connection name when replacing the local SQL resource with Azure SQL. Provision Microsoft Entra administration and least-privilege database access outside the application, then supply token-authenticated Azure SQL configuration through Aspire and managed identity rather than source-controlled credentials. The API's `MarionDbContext` registration remains the persistence seam; environment-specific hosting and identity configuration belong in the AppHost and deployment layer.
 
 ### Common commands
 
