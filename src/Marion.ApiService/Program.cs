@@ -1,4 +1,5 @@
 using Marion.ApiService.Features.System;
+using Marion.ApiService.Infrastructure.Messaging;
 using Marion.ApiService.Infrastructure.Persistence;
 using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.Data.SqlClient;
@@ -49,6 +50,16 @@ builder.AddAzureBlobContainerClient(
     });
 builder.Services.AddDocumentStorage(
     disableHealthChecks: builder.Environment.IsEnvironment("Testing"));
+builder.AddAzureServiceBusClient(
+    "messaging",
+    settings =>
+    {
+        if (!builder.Environment.IsEnvironment("Testing"))
+        {
+            settings.HealthCheckQueueName = MessagingEntityNames.DocumentProcessingQueue;
+        }
+    });
+builder.Services.AddPlatformIntegrationPublisher();
 
 if (integrationTesting)
 {
