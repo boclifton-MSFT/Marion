@@ -46,3 +46,13 @@
 **What:** For future issues, create a draft pull request before beginning implementation; do the work against that draft PR and convert it to non-draft when the work is complete.
 
 **Why:** Keep issue work traceable from the start and make progress visible throughout implementation.
+
+### 2026-07-25T18-06-01: Use the user token for Copilot assignment workflow chaining
+
+**By:** Cleveland
+
+**What:** Use the user token for Copilot assignment workflow chaining
+
+**References:** .github/workflows/squad-triage.yml, .github/workflows/squad-issue-assign.yml, .github/workflows/squad-heartbeat.yml, .squad/templates/workflows/squad-triage.yml, .squad/templates/workflows/squad-issue-assign.yml, .squad/templates/workflows/squad-heartbeat.yml
+
+**Why:** Use COPILOT_ASSIGN_TOKEN for triage label/comment API calls and for the dedicated Copilot assignment steps. A GITHUB_TOKEN-authored squad:copilot label does not start another workflow, so triage must use the user token to let squad-issue-assign run. Assignment requests must resolve repoData.default_branch at runtime, target copilot-swe-agent[bot] with agent_assignment, and fail visibly instead of falling back to a generic assignee.
