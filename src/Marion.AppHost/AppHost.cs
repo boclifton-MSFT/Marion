@@ -1,5 +1,7 @@
 #pragma warning disable ASPIRECERTIFICATES001
 
+using System.Text.Json.Nodes;
+
 var builder = DistributedApplication.CreateBuilder(args);
 var integrationTesting = string.Equals(
     builder.Configuration["IntegrationTesting"],
@@ -20,6 +22,24 @@ var storage = builder.AddAzureStorage("storage")
             emulator.WithLifetime(ContainerLifetime.Session);
         }
     });
+var messaging = builder.AddAzureServiceBus("messaging")
+    .RunAsEmulator(emulator =>
+    {
+        emulator.WithConfiguration(configuration =>
+        {
+            // The official emulator only supports its fixed namespace name.
+            var namespaces = configuration["UserConfig"]?["Namespaces"]?.AsArray()
+                ?? throw new InvalidOperationException(
+                    "The Service Bus emulator namespace configuration is missing.");
+            if (namespaces[0] is not JsonObject serviceBusNamespace)
+            {
+                throw new InvalidOperationException(
+                    "The Service Bus emulator namespace configuration is invalid.");
+            }
+
+            serviceBusNamespace["Name"] = "sbemulatorns";
+        });
+    });
 
 if (!integrationTesting)
 {
@@ -29,12 +49,21 @@ if (!integrationTesting)
 
 var marionDb = sql.AddDatabase("mariondb");
 var documents = storage.AddBlobContainer("documents", "test-files");
+var documentProcessing = messaging.AddServiceBusQueue(
+    "document-processing",
+    "document-processing");
+var loanEvents = messaging.AddServiceBusTopic("loan-events", "loan-events");
+var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
+    "loan-events-subscription",
+    "loan-events-subscription");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WithReference(marionDb)
     .WaitFor(marionDb)
     .WithReference(documents)
     .WaitFor(documents)
+    .WithReference(messaging)
+    .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
 
 if (integrationTesting)
