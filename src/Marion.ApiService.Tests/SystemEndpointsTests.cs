@@ -152,6 +152,40 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
     }
 
     [Fact]
+    public async Task Service_Bus_unavailability_preserves_readiness_liveness_and_safe_dependency_contracts()
+    {
+        using var statusFactory = new MarionApiFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddHealthChecks().AddCheck(
+                    "Azure_ServiceBusClient",
+                    () => HealthCheckResult.Unhealthy(
+                        "Service Bus endpoint and credential are private",
+                        new InvalidOperationException("stack and connection details")))));
+        using var statusClient = statusFactory.CreateClient();
+
+        using var readyResponse = await statusClient.GetAsync("/health");
+        using var liveResponse = await statusClient.GetAsync("/alive");
+        using var dependenciesResponse =
+            await statusClient.GetAsync("/api/system/dependencies");
+        var dependencies = await dependenciesResponse.Content
+            .ReadFromJsonAsync<SystemDependenciesResponse>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, dependenciesResponse.StatusCode);
+        Assert.NotNull(dependencies);
+        Assert.Contains(dependencies.Dependencies, dependency =>
+            dependency.Name == "Azure_ServiceBusClient"
+            && dependency.Status == DependencyState.Unavailable);
+
+        var body = await dependenciesResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Service Bus endpoint", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Synthetic_storage_route_is_not_exposed_in_Production()
     {
         using var productionFactory = new MarionApiFactory("Production");
@@ -159,6 +193,19 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
 
         var response = await productionClient.PostAsync(
             "/api/system/storage/verify",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Synthetic_messaging_route_is_not_exposed_in_Production()
+    {
+        using var productionFactory = new MarionApiFactory("Production");
+        using var productionClient = productionFactory.CreateClient();
+
+        var response = await productionClient.PostAsync(
+            "/api/system/messaging/publish-synthetic",
             content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

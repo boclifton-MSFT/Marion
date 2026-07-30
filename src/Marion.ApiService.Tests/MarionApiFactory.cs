@@ -38,5 +38,8 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
         builder.UseSetting(
             "Aspire:Azure:Storage:Blobs:BlobContainerName",
             "test-files");
+        builder.UseSetting(
+            "Aspire:Azure:Messaging:ServiceBus:FullyQualifiedNamespace",
+            "messaging.invalid");
     }
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Marion.ApiService.Infrastructure.Messaging;
 using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -75,6 +76,23 @@ internal static class SystemEndpoints
                 .WithSummary("Runs a bounded synthetic document storage verification.")
                 .WithDescription("Uploads, reads, verifies, and removes unique non-sensitive synthetic content. Available only in Development and IntegrationTesting.")
                 .Produces<StorageVerificationResponse>(StatusCodes.Status200OK);
+
+            endpoints.MapPost("/api/system/messaging/publish-synthetic", async (
+                IPlatformIntegrationPublisher publisher,
+                CancellationToken cancellationToken) =>
+            {
+                var envelope = await publisher.PublishSyntheticAsync(cancellationToken);
+                return new SyntheticPublishResponse(
+                    envelope.MessageId,
+                    envelope.CorrelationId,
+                    envelope.EventType,
+                    envelope.Version,
+                    envelope.OccurredAtUtc);
+            })
+                .WithName("PublishSyntheticPlatformIntegrationRequest")
+                .WithSummary("Publishes a bounded synthetic platform integration request.")
+                .WithDescription("Publishes a non-sensitive synthetic request to document-processing. Available only in Development and IntegrationTesting.")
+                .Produces<SyntheticPublishResponse>(StatusCodes.Status200OK);
         }
     }
 
@@ -135,6 +153,13 @@ public sealed record SystemDependencyResponse(
 public sealed record StorageVerificationResponse(
     string Status,
     long DurationMilliseconds);
+
+public sealed record SyntheticPublishResponse(
+    string MessageId,
+    string CorrelationId,
+    string EventType,
+    int Version,
+    DateTimeOffset OccurredAtUtc);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum DependencyState
