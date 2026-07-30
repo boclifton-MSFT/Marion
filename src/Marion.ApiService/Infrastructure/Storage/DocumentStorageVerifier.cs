@@ -17,20 +17,21 @@ internal sealed class DocumentStorageVerifier(
         var blobName = $"synthetic/{Guid.NewGuid():N}.probe";
         var expectedContent = RandomNumberGenerator.GetBytes(32);
         var stopwatch = Stopwatch.StartNew();
-        var uploaded = false;
+        var cleanupEligible = false;
         var verified = false;
         var cleanupCompleted = false;
+        Exception? verificationException = null;
         using var operationTimeout =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         operationTimeout.CancelAfter(OperationTimeout);
 
         try
         {
+            cleanupEligible = true;
             await storage.UploadAsync(
                 blobName,
                 expectedContent,
                 operationTimeout.Token);
-            uploaded = true;
 
             var actualContent = await storage.DownloadAsync(
                 blobName,
@@ -42,17 +43,27 @@ internal sealed class DocumentStorageVerifier(
 
             verified = true;
         }
+        catch (Exception exception)
+        {
+            verificationException = exception;
+            throw;
+        }
         finally
         {
             try
             {
-                if (uploaded)
+                if (cleanupEligible)
                 {
                     using var cleanupTimeout = new CancellationTokenSource(CleanupTimeout);
                     await storage.DeleteIfExistsAsync(blobName, cleanupTimeout.Token);
                 }
 
                 cleanupCompleted = true;
+            }
+            catch (Exception) when (verificationException is not null)
+            {
+                logger.LogWarning(
+                    "Document storage synthetic verification cleanup failed after verification failed.");
             }
             finally
             {
