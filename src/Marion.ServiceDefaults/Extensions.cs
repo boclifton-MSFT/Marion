@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,12 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+
+    /// <summary>
+    /// The stable, public response shape returned by the readiness and liveness endpoints.
+    /// </summary>
+    /// <param name="Status">The aggregate health status, such as <c>Healthy</c> or <c>Unhealthy</c>.</param>
+    public sealed record HealthStatusResponse(string Status);
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -110,18 +117,27 @@ public static class Extensions
     {
         // Adding health checks endpoints to applications in non-development environments has security implications.
         // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment()
+            || app.Environment.IsEnvironment("Testing")
+            || app.Environment.IsEnvironment("IntegrationTesting"))
         {
             // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
+            app.MapHealthChecks(HealthEndpointPath, new HealthCheckOptions
+            {
+                ResponseWriter = WriteHealthStatusResponseAsync
+            });
 
             // Only health checks tagged with the "live" tag must pass for app to be considered alive
             app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
             {
-                Predicate = r => r.Tags.Contains("live")
+                Predicate = r => r.Tags.Contains("live"),
+                ResponseWriter = WriteHealthStatusResponseAsync
             });
         }
 
         return app;
     }
+
+    private static Task WriteHealthStatusResponseAsync(HttpContext context, HealthReport report) =>
+        context.Response.WriteAsJsonAsync(new HealthStatusResponse(report.Status.ToString()));
 }

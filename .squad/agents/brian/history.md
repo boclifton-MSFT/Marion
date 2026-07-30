@@ -13,3 +13,5 @@
 Brian owns backend APIs, Azure Functions workflows, validation, resilience, and service communication.
 
 📌 Team update (2026-07-25T11:57:39.972-05:00): Stewie's Layer 2.02 handoff approved the single-project vertical-slice modular monolith and reassigned issue #2 to Brian — decided by Stewie.
+
+📌 Team update (2026-07-30T10:41:01.2038306-05:00): `/health` and `/alive` now emit the stable JSON contract `{ status: HealthStatus }` while retaining their status-code semantics; seven focused endpoint tests passed — completed by Brian.

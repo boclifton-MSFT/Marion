@@ -16,6 +16,7 @@ The goal is practical: help loan teams spend less time chasing information and m
 
 - .NET 10 and ASP.NET Core
 - Aspire 13.4 for local orchestration, service discovery, health checks, and telemetry
+- SQL Server and Entity Framework Core for relational persistence
 - Nuxt 4, Vue 3, Nuxt UI, and TypeScript
 - OpenTelemetry for distributed traces, metrics, and logs
 
@@ -39,6 +40,7 @@ The goal is practical: help loan teams spend less time chasing information and m
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
+- A supported container runtime for the local SQL Server resource
 - [Node.js](https://nodejs.org/) 22.19 or newer
 - [pnpm](https://pnpm.io/) 11
 
@@ -51,7 +53,19 @@ Set-Location ..\..
 aspire start
 ```
 
-The Aspire CLI prints the authenticated dashboard URL and starts both the API and web application.
+The Aspire CLI prints the authenticated dashboard URL and starts SQL Server, the API, and the web application. Local SQL data is stored in an Aspire-managed volume and the SQL container uses a persistent lifetime so normal AppHost restarts preserve development data.
+
+### Persistence and health
+
+The AppHost models the SQL Server resource as `sql` and its application database as `mariondb`. Aspire supplies the `mariondb` connection string to the API, where `MarionDbContext` is registered through the Aspire Entity Framework Core SQL Server integration.
+
+The API does not run migrations during startup and currently defines no mortgage-domain schema. SQL connectivity is included in `/health` readiness checks; `/alive` remains a process-only liveness check. On success, both health endpoints return HTTP 200 with the stable JSON response `{ "status": "Healthy" }`; consumers must not rely on a raw-text response. The safe `/api/system/dependencies` response exposes only logical health states and never connection details.
+
+Tests generate unique database configuration and disable the external SQL connectivity check under the `Testing` environment, keeping test state isolated from persistent development data.
+
+### Future Azure SQL configuration
+
+Keep the `mariondb` logical connection name when replacing the local SQL resource with Azure SQL. Provision Microsoft Entra administration and least-privilege database access outside the application, then supply token-authenticated Azure SQL configuration through Aspire and managed identity rather than source-controlled credentials. The API's `MarionDbContext` registration remains the persistence seam; environment-specific hosting and identity configuration belong in the AppHost and deployment layer.
 
 ### Common commands
 
