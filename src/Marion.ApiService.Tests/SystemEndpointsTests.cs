@@ -74,16 +74,19 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
     }
 
     [Theory]
-    [InlineData(HealthStatus.Degraded, DependencyState.Degraded)]
-    [InlineData(HealthStatus.Unhealthy, DependencyState.Unavailable)]
+    [InlineData(nameof(MarionDbContext), HealthStatus.Degraded, DependencyState.Degraded)]
+    [InlineData(nameof(MarionDbContext), HealthStatus.Unhealthy, DependencyState.Unavailable)]
+    [InlineData("documents", HealthStatus.Degraded, DependencyState.Degraded)]
+    [InlineData("documents", HealthStatus.Unhealthy, DependencyState.Unavailable)]
     public async Task Dependencies_maps_unhealthy_states_without_exposing_diagnostics(
+        string dependencyName,
         HealthStatus healthStatus,
         DependencyState expectedState)
     {
         using var statusFactory = new MarionApiFactory().WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
                 services.AddHealthChecks().AddCheck(
-                    nameof(MarionDbContext),
+                    dependencyName,
                     () => new HealthCheckResult(
                         healthStatus,
                         "Data Source=internal;SensitiveValue=not-safe",
@@ -96,7 +99,7 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(payload);
         Assert.Contains(payload.Dependencies, dependency =>
-            dependency.Name == nameof(MarionDbContext)
+            dependency.Name == dependencyName
             && dependency.Status == expectedState);
 
         var body = await response.Content.ReadAsStringAsync();
@@ -104,6 +107,61 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.DoesNotContain("not-safe", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Blob_unavailability_preserves_readiness_liveness_and_safe_dependency_contracts()
+    {
+        using var statusFactory = new MarionApiFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddHealthChecks().AddCheck(
+                    "documents",
+                    () => HealthCheckResult.Unhealthy(
+                        "Blob endpoint internal; storage credential redacted",
+                        new InvalidOperationException("stack and connection details")))));
+        using var statusClient = statusFactory.CreateClient();
+
+        using var readyResponse = await statusClient.GetAsync("/health");
+        using var liveResponse = await statusClient.GetAsync("/alive");
+        using var dependenciesResponse =
+            await statusClient.GetAsync("/api/system/dependencies");
+        using var readyPayload =
+            JsonDocument.Parse(await readyResponse.Content.ReadAsStreamAsync());
+        using var livePayload =
+            JsonDocument.Parse(await liveResponse.Content.ReadAsStreamAsync());
+        var dependencies = await dependenciesResponse.Content
+            .ReadFromJsonAsync<SystemDependenciesResponse>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
+        Assert.Equal("application/json", readyResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Unhealthy", readyPayload.RootElement.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
+        Assert.Equal("application/json", liveResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Healthy", livePayload.RootElement.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, dependenciesResponse.StatusCode);
+        Assert.NotNull(dependencies);
+        Assert.Contains(dependencies.Dependencies, dependency =>
+            dependency.Name == "documents"
+            && dependency.Status == DependencyState.Unavailable);
+
+        var body = await dependenciesResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Blob endpoint", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("redacted", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Synthetic_storage_route_is_not_exposed_in_Production()
+    {
+        using var productionFactory = new MarionApiFactory("Production");
+        using var productionClient = productionFactory.CreateClient();
+
+        var response = await productionClient.PostAsync(
+            "/api/system/storage/verify",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

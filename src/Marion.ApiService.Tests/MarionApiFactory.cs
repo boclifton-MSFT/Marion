@@ -32,5 +32,11 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
 
         builder.UseEnvironment(environmentName);
         builder.UseSetting("ConnectionStrings:mariondb", connectionString);
+        builder.UseSetting(
+            "Aspire:Azure:Storage:Blobs:ServiceUri",
+            "https://storage.invalid");
+        builder.UseSetting(
+            "Aspire:Azure:Storage:Blobs:BlobContainerName",
+            "test-files");
     }
 }

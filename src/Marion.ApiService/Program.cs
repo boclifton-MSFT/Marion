@@ -1,6 +1,8 @@
 using Marion.ApiService.Features.System;
 using Marion.ApiService.Infrastructure.Persistence;
+using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +30,25 @@ builder.AddSqlServerDbContext<MarionDbContext>(
         settings.DisableRetry = integrationTesting;
         settings.CommandTimeout = integrationTesting ? 3 : null;
     });
+builder.AddAzureBlobContainerClient(
+    "documents",
+    settings =>
+    {
+        settings.DisableHealthChecks = true;
+    },
+    clientBuilder =>
+    {
+        if (integrationTesting)
+        {
+            clientBuilder.ConfigureOptions(options =>
+            {
+                options.Retry.MaxRetries = 0;
+                options.Retry.NetworkTimeout = TimeSpan.FromSeconds(3);
+            });
+        }
+    });
+builder.Services.AddDocumentStorage(
+    disableHealthChecks: builder.Environment.IsEnvironment("Testing"));
 
 if (integrationTesting)
 {
@@ -53,7 +74,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.MapSystemEndpoints();
+app.MapSystemEndpoints(app.Environment);
 app.MapDefaultEndpoints();
 
 app.Run();

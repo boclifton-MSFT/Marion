@@ -7,6 +7,19 @@ var integrationTesting = string.Equals(
     StringComparison.OrdinalIgnoreCase);
 
 var sql = builder.AddSqlServer("sql");
+var storage = builder.AddAzureStorage("storage")
+    .RunAsEmulator(emulator =>
+    {
+        if (!integrationTesting)
+        {
+            emulator.WithDataVolume()
+                .WithLifetime(ContainerLifetime.Persistent);
+        }
+        else
+        {
+            emulator.WithLifetime(ContainerLifetime.Session);
+        }
+    });
 
 if (!integrationTesting)
 {
@@ -15,10 +28,13 @@ if (!integrationTesting)
 }
 
 var marionDb = sql.AddDatabase("mariondb");
+var documents = storage.AddBlobContainer("documents", "test-files");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WithReference(marionDb)
     .WaitFor(marionDb)
+    .WithReference(documents)
+    .WaitFor(documents)
     .WithHttpHealthCheck("/health");
 
 if (integrationTesting)

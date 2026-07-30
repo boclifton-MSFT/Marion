@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -19,7 +20,9 @@ internal static class SystemEndpoints
         "BUILD_ID"
     ];
 
-    internal static void MapSystemEndpoints(this IEndpointRouteBuilder endpoints)
+    internal static void MapSystemEndpoints(
+        this IEndpointRouteBuilder endpoints,
+        IHostEnvironment environment)
     {
         endpoints.MapGet("/", () => "The Marion API is running.")
             .WithName("GetRoot")
@@ -56,6 +59,23 @@ internal static class SystemEndpoints
             .WithSummary("Returns the health state of application dependencies.")
             .WithDescription("Returns logical dependency names and safe health states without diagnostic details or exception data.")
             .Produces<SystemDependenciesResponse>(StatusCodes.Status200OK);
+
+        if (environment.IsDevelopment() || environment.IsEnvironment("IntegrationTesting"))
+        {
+            endpoints.MapPost("/api/system/storage/verify", async (
+                IDocumentStorageVerifier verifier,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await verifier.VerifyAsync(cancellationToken);
+                return new StorageVerificationResponse(
+                    "Healthy",
+                    result.DurationMilliseconds);
+            })
+                .WithName("VerifyDocumentStorage")
+                .WithSummary("Runs a bounded synthetic document storage verification.")
+                .WithDescription("Uploads, reads, verifies, and removes unique non-sensitive synthetic content. Available only in Development and IntegrationTesting.")
+                .Produces<StorageVerificationResponse>(StatusCodes.Status200OK);
+        }
     }
 
     private static string GetApplicationVersion()
@@ -111,6 +131,10 @@ public sealed record SystemDependenciesResponse(
 public sealed record SystemDependencyResponse(
     string Name,
     DependencyState Status);
+
+public sealed record StorageVerificationResponse(
+    string Status,
+    long DurationMilliseconds);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum DependencyState
