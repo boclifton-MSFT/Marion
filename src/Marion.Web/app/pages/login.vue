@@ -67,7 +67,7 @@ const providers = [{
   label: 'Google',
   icon: 'i-simple-icons-google',
   onClick: () => {
-    toast.add({ title: 'Google', description: 'Login with Google' })
+    window.location.assign('/auth/google')
   }
 }, {
   label: 'GitHub',
