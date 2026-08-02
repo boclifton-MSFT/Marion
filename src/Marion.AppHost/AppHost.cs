@@ -74,11 +74,15 @@ else
 {
     builder.AddViteApp("frontend", "../Marion.Web")
         .WithPnpm()
-        .WithHttpEndpoint(env: "PORT")
+        .WithHttpsEndpoint(port: 7257, env: "PORT")
+        .WithHttpsDeveloperCertificate()
         .WithExternalHttpEndpoints()
+        .WithReference(marionDb)
+        .WaitFor(marionDb)
         .WithReference(apiService)
         .WaitFor(apiService)
-        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"));
+        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"))
+        .WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true");
 }
 
 builder.Build().Run();

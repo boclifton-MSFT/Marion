@@ -19,7 +19,33 @@ export default defineNuxtConfig({
     apiBase: process.env.NUXT_API_BASE
       || process.env.services__apiservice_https_0
       || process.env.services__apiservice_http_0
-      || 'http://localhost:5435'
+      || 'http://localhost:5435',
+    oauth: {
+      oidc: {
+        issuer: '',
+        clientId: '',
+        clientSecret: '',
+        redirectUri: ''
+      }
+    },
+    session: {
+      name: '__Host-marion_session',
+      password: '',
+      maxAge: 60 * 60 * 8,
+      sessionHeader: false,
+      cookie: {
+        secure: true,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/'
+      }
+    },
+    authStore: {
+      connectionString: process.env.NUXT_AUTH_STORE_CONNECTION_STRING
+        || process.env.ConnectionStrings__mariondb
+        || '',
+      provisionSchema: process.env.NUXT_AUTH_STORE_PROVISION_SCHEMA === 'true'
+    }
   },
 
   routeRules: {

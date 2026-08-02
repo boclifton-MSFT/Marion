@@ -80,6 +80,12 @@ For future Azure hosting, keep the `documents` logical connection name and provi
 
 Keep the `mariondb` logical connection name when replacing the local SQL resource with Azure SQL. Provision Microsoft Entra administration and least-privilege database access outside the application, then supply token-authenticated Azure SQL configuration through Aspire and managed identity rather than source-controlled credentials. The API's `MarionDbContext` registration remains the persistence seam; environment-specific hosting and identity configuration belong in the AppHost and deployment layer.
 
+### Authentication persistence
+
+Google sign-in uses the same shared `mariondb` database for server-only authorization transactions, sessions, and `(issuer, sub)` identity mappings. Aspire gives the Nuxt **server** a database reference and enables local schema provisioning; the browser receives neither the connection nor any provider credential.
+
+Production operators must supply `NUXT_AUTH_STORE_CONNECTION_STRING` through their deployment secret mechanism, provision the `MarionAuthTransactions`, `MarionAuthSessions`, and `MarionExternalIdentities` tables in a controlled one-time migration/provisioning run, then keep `NUXT_AUTH_STORE_PROVISION_SCHEMA` disabled on runtime replicas. Use a shared transactional SQL Server/Azure SQL database with a least-privilege principal. Process-local Nitro storage, local files, and per-replica SQLite are not supported because they cannot guarantee replay prevention, session revocation, or identity uniqueness across restarts and replicas.
+
 ### Common commands
 
 ```powershell
