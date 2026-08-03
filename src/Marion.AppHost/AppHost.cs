@@ -8,6 +8,13 @@ var integrationTesting = string.Equals(
     "true",
     StringComparison.OrdinalIgnoreCase);
 
+var googleClientId = builder.AddParameter("GoogleClientId");
+var googleClientSecret = builder.AddParameter("GoogleClientSecret", secret: true);
+
+var keyVault = builder.AddAzureKeyVault("marionkv");
+keyVault.AddSecret("google-client-id", googleClientId);
+keyVault.AddSecret("google-client-secret", googleClientSecret);
+
 var sql = builder.AddSqlServer("sql");
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(emulator =>
@@ -58,6 +65,7 @@ var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
+    .WithReference(keyVault)
     .WithReference(marionDb)
     .WaitFor(marionDb)
     .WithReference(documents)
