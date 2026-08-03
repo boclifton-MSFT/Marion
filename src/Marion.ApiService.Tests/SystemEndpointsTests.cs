@@ -6,6 +6,7 @@ using Marion.ApiService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Marion.ApiService.Tests;
@@ -71,6 +72,44 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.Equal(JsonValueKind.Object, payload.RootElement.ValueKind);
         Assert.Single(payload.RootElement.EnumerateObject());
         Assert.Equal("Healthy", payload.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Health_endpoints_are_available_and_probe_safe_in_Production_when_a_dependency_fails()
+    {
+        using var productionFactory = new MarionApiFactory("Production").WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddHealthChecks().AddCheck(
+                    "external-dependency",
+                    () => HealthCheckResult.Unhealthy(
+                        "Connection string=secret; internal endpoint",
+                        new InvalidOperationException("diagnostic details")));
+
+                services.PostConfigure<HealthCheckServiceOptions>(options =>
+                {
+                    foreach (var registration in options.Registrations
+                        .Where(registration =>
+                            registration.Name is not ("self" or "external-dependency"))
+                        .ToArray())
+                    {
+                        options.Registrations.Remove(registration);
+                    }
+                });
+            }));
+        using var productionClient = productionFactory.CreateClient();
+
+        using var readyResponse = await productionClient.GetAsync("/health");
+        using var liveResponse = await productionClient.GetAsync("/alive");
+        var readyBody = await readyResponse.Content.ReadAsStringAsync();
+        var liveBody = await liveResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
+        Assert.Equal("""{"status":"Unhealthy"}""", readyBody);
+        Assert.Equal("""{"status":"Healthy"}""", liveBody);
+        Assert.DoesNotContain("secret", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("endpoint", readyBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
