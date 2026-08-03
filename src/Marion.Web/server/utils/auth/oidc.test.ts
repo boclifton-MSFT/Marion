@@ -27,7 +27,8 @@ function base64Json(value: object): string {
 
 function signedIdToken(
   privateKey: KeyObject,
-  nowSeconds: number
+  nowSeconds: number,
+  claimOverrides: Record<string, unknown> = {}
 ): string {
   const signed = `${base64Json({ alg: 'RS256', kid: 'test-key', typ: 'JWT' })}.${base64Json({
     iss: settings.issuer,
@@ -35,7 +36,8 @@ function signedIdToken(
     sub: 'provider-subject',
     nonce: transaction.nonce,
     iat: nowSeconds - 20,
-    exp: nowSeconds + 10 * 60
+    exp: nowSeconds + 10 * 60,
+    ...claimOverrides
   })}`
   const signer = createSign('RSA-SHA256')
   signer.update(signed)
@@ -43,10 +45,14 @@ function signedIdToken(
   return `${signed}.${signer.sign(privateKey).toString('base64url')}`
 }
 
-function configuration(nowSeconds: number, tamperKey = false): oidc.Configuration {
+function configuration(
+  nowSeconds: number,
+  claimOverrides: Record<string, unknown> = {},
+  tamperKey = false
+): oidc.Configuration {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const jwk = publicKey.export({ format: 'jwk' })
-  const token = signedIdToken(privateKey as KeyObject, nowSeconds)
+  const token = signedIdToken(privateKey as KeyObject, nowSeconds, claimOverrides)
   const config = new oidc.Configuration({
     issuer: settings.issuer,
     authorization_endpoint: `${settings.issuer}/authorize`,
@@ -94,7 +100,7 @@ describe('OIDC ID-token verification', () => {
 
   it('rejects an ID token when no issuer JWKS key validates its signature', async () => {
     const now = Date.now()
-    const config = configuration(Math.floor(now / 1000), true)
+    const config = configuration(Math.floor(now / 1000), {}, true)
 
     await expect(completeAuthorization(
       config,
@@ -103,5 +109,27 @@ describe('OIDC ID-token verification', () => {
       '?code=authorization-code&state=state-value',
       now
     )).rejects.toThrow()
+  })
+
+  it.each([
+    ['issuer', { iss: 'https://attacker.example.test' }],
+    ['audience', { aud: 'another-client' }],
+    ['nonce', { nonce: 'another-nonce' }],
+    ['expiry', { exp: 1 }],
+    ['missing subject', { sub: undefined }],
+    ['empty subject', { sub: '' }]
+  ])('fails closed for an invalid %s in a signed provider token', async (_, claimOverrides) => {
+    const now = Date.now()
+    const config = configuration(Math.floor(now / 1000), claimOverrides)
+
+    const identity = await completeAuthorization(
+      config,
+      settings,
+      transaction,
+      '?code=authorization-code&state=state-value',
+      now
+    ).catch(() => undefined)
+
+    expect(identity).toBeUndefined()
   })
 })
