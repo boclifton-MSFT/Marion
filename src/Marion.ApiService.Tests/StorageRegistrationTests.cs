@@ -1,3 +1,5 @@
+using Azure.Core;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +30,7 @@ public sealed class StorageRegistrationTests
             Assert.Single(registrations, registration => registration.Name == "documents");
 
         Assert.Equal("test-files", containerClient.Name);
+        Assert.Equal("https://storage.invalid/test-files", containerClient.Uri.AbsoluteUri);
         Assert.IsType<AzureBlobDocumentStorage>(storage);
         Assert.IsType<DocumentStorageVerifier>(verifier);
         Assert.DoesNotContain("live", documentsRegistration.Tags);
@@ -50,5 +53,49 @@ public sealed class StorageRegistrationTests
         Assert.NotNull(factory.Services.GetRequiredService<BlobContainerClient>());
         Assert.NotNull(factory.Services.GetRequiredService<IDocumentStorage>());
         Assert.NotNull(factory.Services.GetRequiredService<IDocumentStorageVerifier>());
+    }
+
+    [Fact]
+    public void Azure_mode_uses_the_explicit_blob_endpoint_and_shared_token_credential()
+    {
+        using var factory = new MarionApiFactory("Testing").WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Marion:Platform:Mode", "Azure");
+            builder.UseSetting(
+                "Marion:Platform:Azure:BlobServiceUri",
+                "https://documents.blob.core.windows.net");
+            builder.UseSetting(
+                "Marion:Platform:Azure:BlobContainerName",
+                "documents");
+            builder.UseSetting(
+                "Marion:Platform:Azure:ServiceBusFullyQualifiedNamespace",
+                "messaging.servicebus.windows.net");
+            builder.UseSetting(
+                "Marion:Platform:Azure:SqlServer",
+                "marion.database.windows.net");
+            builder.UseSetting(
+                "Marion:Platform:Azure:SqlDatabase",
+                "marion");
+            builder.UseSetting(
+                "Marion:Platform:Azure:Identity:TenantId",
+                "tenant-id");
+            builder.UseSetting(
+                "ConnectionStrings:documents",
+                "Endpoint=https://fallback.invalid;ContainerName=fallback");
+        });
+
+        using var scope = factory.Services.CreateScope();
+        var containerClient = scope.ServiceProvider
+            .GetRequiredService<BlobContainerClient>();
+        var credential = scope.ServiceProvider
+            .GetRequiredService<TokenCredential>();
+
+        Assert.Equal(
+            "https://documents.blob.core.windows.net/documents",
+            containerClient.Uri.AbsoluteUri);
+        Assert.IsType<DefaultAzureCredential>(credential);
+        Assert.Same(
+            credential,
+            scope.ServiceProvider.GetRequiredService<DefaultAzureCredential>());
     }
 }
