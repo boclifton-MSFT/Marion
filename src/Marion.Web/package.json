@@ -8,6 +8,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
+    "test": "vitest run",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -20,14 +21,18 @@
     "@takumi-rs/core": "2.5.0",
     "@vueuse/nuxt": "^14.3.0",
     "better-sqlite3": "^12.11.1",
+    "mssql": "^12.7.0",
     "nuxt": "^4.5.0",
     "nuxt-og-image": "^6.7.4",
+    "openid-client": "6.8.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.16.0",
+    "@types/mssql": "^12.3.0",
     "eslint": "^10.8.0",
     "typescript": "^6.0.3",
+    "vitest": "4.1.0",
     "vue-tsc": "^3.3.8"
   },
   "packageManager": "pnpm@11.17.0"
