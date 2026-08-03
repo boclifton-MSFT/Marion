@@ -59,7 +59,19 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig(event)
   const apiBase = String(config.apiBase).replace(/\/+$/, '')
-  const upstreamUrl = new URL(`/api/${path.replace(/^\/+/, '')}`, `${apiBase}/`)
+  const upstreamBase = new URL(`${apiBase}/`)
+  const upstreamUrl = new URL(`/api/${path.replace(/^\/+/, '')}`, upstreamBase)
+
+  // The URL parser resolves dot segments, so an encoded traversal would otherwise let
+  // /api/../internal/auth/... escape the public prefix and reach the internal auth surface.
+  if (upstreamUrl.origin !== upstreamBase.origin
+    || !upstreamUrl.pathname.startsWith('/api/')) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'API route not found'
+    })
+  }
+
   upstreamUrl.search = getRequestURL(event).search
 
   const requestHeaders = getRequestHeaders(event)
