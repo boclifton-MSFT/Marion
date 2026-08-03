@@ -1,0 +1,49 @@
+{
+  "name": "Marion (.NET 10 + Nuxt)",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:10.0",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "bash -c 'set -euo pipefail; corepack enable; dotnet tool install --global Aspire.Cli --version 13.4.6; dotnet restore src/Marion.slnx; (cd src/Marion.Web && corepack pnpm install --frozen-lockfile)'",
+  "forwardPorts": [17171, 7257, 7392, 5435],
+  "portsAttributes": {
+    "17171": {
+      "label": "Aspire dashboard",
+      "onAutoForward": "notify"
+    },
+    "7257": {
+      "label": "Marion web (HTTPS)",
+      "onAutoForward": "notify"
+    },
+    "7392": {
+      "label": "Marion API (HTTPS)",
+      "onAutoForward": "notify"
+    },
+    "5435": {
+      "label": "Marion API (HTTP)",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "Vue.volar",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "GitHub.vscode-pull-request-github"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "dotnet.defaultSolution": "src/Marion.slnx"
+      }
+    }
+  }
+}
