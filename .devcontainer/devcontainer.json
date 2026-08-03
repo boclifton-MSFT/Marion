@@ -1,7 +1,10 @@
 {
   "name": "Marion (.NET 10 + Nuxt)",
-  "image": "mcr.microsoft.com/devcontainers/dotnet:10.0",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0"
+    },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22"
     },
