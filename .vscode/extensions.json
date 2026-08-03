@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "ms-dotnettools.csdevkit",
+    "vue.volar"
+  ],
+  // Prettier would fight the ESLint stylistic rules that gate this repo.
+  "unwantedRecommendations": [
+    "esbenp.prettier-vscode"
+  ]
+}
