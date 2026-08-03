@@ -1,4 +1,5 @@
 using Azure;
+using Azure.Identity;
 using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Xunit;
@@ -20,6 +21,26 @@ public sealed class DocumentStorageHealthCheckTests
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
         Assert.Equal("Document storage is unavailable.", result.Description);
         Assert.Null(result.Exception);
+    }
+
+    [Fact]
+    public async Task CheckHealth_returns_a_sanitized_unhealthy_result_for_authentication_failures()
+    {
+        const string sensitiveDiagnostics = "tenant secret and credential details";
+        var healthCheck = new DocumentStorageHealthCheck(
+            new FailingDocumentStorage(new AuthenticationFailedException(sensitiveDiagnostics)));
+
+        var result = await healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("Document storage is unavailable.", result.Description);
+        Assert.Null(result.Exception);
+        Assert.DoesNotContain(
+            sensitiveDiagnostics,
+            result.Description,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
