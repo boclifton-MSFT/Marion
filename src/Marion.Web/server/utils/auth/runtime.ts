@@ -25,6 +25,10 @@ interface RuntimeConfigShape {
   }
 }
 
+export interface AuthConfigValidationOptions {
+  production?: boolean
+}
+
 function normalizeIssuer(value: string): string | undefined {
   try {
     const issuer = new URL(value)
@@ -98,6 +102,38 @@ export function getAuthStoreSettings(
     connectionString,
     provisionSchema: config.authStore?.provisionSchema === true
   }
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase()
+  return normalized === 'localhost'
+    || normalized.endsWith('.localhost')
+    || normalized === '::1'
+    || normalized.startsWith('127.')
+}
+
+export function authConfigurationIssues(
+  config: RuntimeConfigShape,
+  options: AuthConfigValidationOptions = {}
+): string[] {
+  const issues: string[] = []
+  const oidc = getOidcSettings(config)
+
+  if (!oidc) {
+    issues.push('NUXT_OAUTH_OIDC_ISSUER, NUXT_OAUTH_OIDC_CLIENT_ID, NUXT_OAUTH_OIDC_CLIENT_SECRET, or NUXT_OAUTH_OIDC_REDIRECT_URI')
+  } else if (options.production && isLocalHostname(new URL(oidc.redirectUri).hostname)) {
+    issues.push('NUXT_OAUTH_OIDC_REDIRECT_URI must use a public HTTPS origin in production')
+  }
+
+  if (!getSessionPassword(config)) {
+    issues.push('NUXT_SESSION_PASSWORD')
+  }
+
+  if (!getAuthStoreSettings(config)) {
+    issues.push('NUXT_AUTH_STORE_CONNECTION_STRING')
+  }
+
+  return issues
 }
 
 export function authRuntimeConfig(event: H3Event): RuntimeConfigShape {

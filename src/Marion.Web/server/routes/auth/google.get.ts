@@ -1,12 +1,15 @@
 import { defineEventHandler, getQuery, sendRedirect } from 'h3'
 import { getAuthDependencies } from '../../utils/auth/dependencies'
 import {
+  authConfigurationIssues,
   authRuntimeConfig,
-  getAuthStoreSettings,
-  getOidcSettings,
-  getSessionPassword
+  getOidcSettings
 } from '../../utils/auth/runtime'
-import { createOAuthTransaction, safeReturnTo } from '../../utils/auth/security'
+import {
+  createOAuthTransaction,
+  OAUTH_TRANSACTION_MAX_AGE_SECONDS,
+  safeReturnTo
+} from '../../utils/auth/security'
 import { saveTransactionInCookie } from '../../utils/auth/session'
 
 const SIGN_IN_UNAVAILABLE = '/login?error=sign-in-unavailable'
@@ -16,7 +19,7 @@ export default defineEventHandler(async (event) => {
   try {
     const runtimeConfig = authRuntimeConfig(event)
     const settings = getOidcSettings(runtimeConfig)
-    if (!settings || !getSessionPassword(runtimeConfig) || !getAuthStoreSettings(runtimeConfig)) {
+    if (!settings || authConfigurationIssues(runtimeConfig).length > 0) {
       return sendRedirect(event, SIGN_IN_UNAVAILABLE)
     }
 
@@ -33,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
     await dependencies.transactions.create(
       transaction.transactionId,
-      transaction.issuedAt + 5 * 60 * 1000
+      transaction.issuedAt + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000
     )
 
     return sendRedirect(event, (await dependencies.oidc.authorizationUrl(settings, transaction)).href)

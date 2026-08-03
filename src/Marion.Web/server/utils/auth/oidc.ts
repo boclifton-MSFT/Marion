@@ -23,7 +23,10 @@ export async function oidcConfiguration(settings: OidcRuntimeSettings): Promise<
       client_secret: settings.clientSecret,
       redirect_uris: [settings.redirectUri]
     }
-  ).catch((error: unknown) => {
+  ).then((discovered) => {
+    oidc.enableNonRepudiationChecks(discovered)
+    return discovered
+  }).catch((error: unknown) => {
     configuration = undefined
     throw error
   })

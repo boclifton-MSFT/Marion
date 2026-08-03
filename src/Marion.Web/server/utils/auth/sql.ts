@@ -267,6 +267,9 @@ DELETE FROM dbo.MarionAuthSessions WHERE SessionId = @sessionId;`, { sessionId }
     if (this.settings.provisionSchema) {
       this.schemaReady ??= connection.transaction(async (transaction) => {
         await transaction.query(schemaStatement)
+      }).catch((error: unknown) => {
+        this.schemaReady = undefined
+        throw error
       })
       await this.schemaReady
     }

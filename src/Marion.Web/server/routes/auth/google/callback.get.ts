@@ -1,8 +1,8 @@
 import { defineEventHandler, getQuery, getRequestURL, sendRedirect } from 'h3'
 import { getAuthDependencies } from '../../../utils/auth/dependencies'
 import {
+  authConfigurationIssues,
   authRuntimeConfig,
-  getAuthStoreSettings,
   getOidcSettings
 } from '../../../utils/auth/runtime'
 import { constantTimeEquals } from '../../../utils/auth/security'
@@ -17,18 +17,20 @@ function queryValue(value: unknown): string | undefined {
 export default defineEventHandler(async (event) => {
   const dependencies = getAuthDependencies(event)
   try {
-    const settings = getOidcSettings(authRuntimeConfig(event))
-    const transaction = await consumeTransactionFromCookie(event, dependencies.clock.now())
+    const runtimeConfig = authRuntimeConfig(event)
+    const now = dependencies.clock.now()
+    const settings = getOidcSettings(runtimeConfig)
+    const transaction = await consumeTransactionFromCookie(event, now)
     const state = queryValue(getQuery(event).state)
     if (!settings
-      || !getAuthStoreSettings(authRuntimeConfig(event))
+      || authConfigurationIssues(runtimeConfig).length > 0
       || !transaction
       || !state
       || !constantTimeEquals(state, transaction.state)) {
       return sendRedirect(event, SIGN_IN_FAILED)
     }
 
-    if (!await dependencies.transactions.consume(transaction.transactionId, dependencies.clock.now())) {
+    if (!await dependencies.transactions.consume(transaction.transactionId, now)) {
       return sendRedirect(event, SIGN_IN_FAILED)
     }
 
@@ -40,13 +42,13 @@ export default defineEventHandler(async (event) => {
       settings,
       transaction,
       getRequestURL(event).search,
-      dependencies.clock.now()
+      now
     )
     if (!identity) {
       return sendRedirect(event, SIGN_IN_FAILED)
     }
 
-    const userId = await dependencies.identities.resolve(identity, dependencies.clock.now())
+    const userId = await dependencies.identities.resolve(identity, now)
     await rotateMarionSession(event, userId, dependencies)
     return sendRedirect(event, transaction.returnTo)
   } catch {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getAuthStoreSettings, getOidcSettings, getSessionPassword } from './runtime'
+import {
+  authConfigurationIssues,
+  getAuthStoreSettings,
+  getOidcSettings,
+  getSessionPassword
+} from './runtime'
 
 const validConfig = {
   oauth: {
@@ -45,5 +50,34 @@ describe('private OIDC runtime configuration', () => {
   it('requires a private shared auth-store connection string', () => {
     expect(getAuthStoreSettings(validConfig)).toEqual(validConfig.authStore)
     expect(getAuthStoreSettings({ authStore: { connectionString: '  ' } })).toBeUndefined()
+  })
+
+  it('reports preflight configuration names without leaking configuration values', () => {
+    const issues = authConfigurationIssues({
+      oauth: { oidc: { clientSecret: 'private-client-secret' } },
+      session: { password: 'private-session-password' },
+      authStore: { connectionString: 'Server=private-auth-store' }
+    })
+
+    expect(issues).toEqual([
+      'NUXT_OAUTH_OIDC_ISSUER, NUXT_OAUTH_OIDC_CLIENT_ID, NUXT_OAUTH_OIDC_CLIENT_SECRET, or NUXT_OAUTH_OIDC_REDIRECT_URI',
+      'NUXT_SESSION_PASSWORD'
+    ])
+    expect(issues.join('\n')).not.toContain('private-')
+  })
+
+  it('requires a public HTTPS callback origin in production', () => {
+    expect(authConfigurationIssues(validConfig, { production: true })).toEqual([
+      'NUXT_OAUTH_OIDC_REDIRECT_URI must use a public HTTPS origin in production'
+    ])
+    expect(authConfigurationIssues({
+      ...validConfig,
+      oauth: {
+        oidc: {
+          ...validConfig.oauth.oidc,
+          redirectUri: 'https://app.example.test/auth/google/callback'
+        }
+      }
+    }, { production: true })).toEqual([])
   })
 })

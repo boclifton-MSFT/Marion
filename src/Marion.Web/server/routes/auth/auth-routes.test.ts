@@ -38,6 +38,7 @@ Object.assign(globalThis, {
 
 interface TestAuthState {
   dependencies: AuthDependencies
+  authorizationUrl: ReturnType<typeof vi.fn>
   exchangeCode: ReturnType<typeof vi.fn>
   telemetry: string[]
   sessions: Map<string, MarionSession>
@@ -47,6 +48,9 @@ function createTestAuthState(): TestAuthState {
   const transactions = new Map<string, number>()
   const sessions = new Map<string, MarionSession>()
   const telemetry: string[] = []
+  const authorizationUrl = vi.fn(async (settings: { redirectUri: string }) => new URL(
+    `https://accounts.google.com/o/oauth2/v2/auth?state=state-sentinel&redirect_uri=${encodeURIComponent(settings.redirectUri)}`
+  ))
   const exchangeCode = vi.fn(async () => ({
     issuer: 'https://accounts.google.com',
     subject: 'provider-subject'
@@ -54,6 +58,7 @@ function createTestAuthState(): TestAuthState {
   let generatedId = 0
 
   return {
+    authorizationUrl,
     exchangeCode,
     telemetry,
     sessions,
@@ -68,9 +73,7 @@ function createTestAuthState(): TestAuthState {
         pkceVerifier: () => 'verifier-sentinel'
       },
       oidc: {
-        authorizationUrl: async () => new URL(
-          'https://accounts.google.com/o/oauth2/v2/auth?state=state-sentinel'
-        ),
+        authorizationUrl,
         exchangeCode
       },
       telemetry: {
@@ -221,6 +224,28 @@ describe('Google auth route boundary', () => {
     expect(output).not.toContain('verifier-sentinel')
     expect(output).not.toContain('nonce-sentinel')
     expect(output).not.toContain(sessionPassword)
+  })
+
+  it('uses the configured HTTPS callback origin behind an HTTP proxy request', async () => {
+    const state = createTestAuthState()
+    const server = await startServer(state)
+    servers.push(server)
+
+    const response = await fetch(`${server.baseUrl}/auth/google`, {
+      headers: {
+        'forwarded': 'for=192.0.2.1;proto=http;host=forged.example.test',
+        'x-forwarded-host': 'forged.example.test',
+        'x-forwarded-proto': 'http'
+      },
+      redirect: 'manual'
+    })
+    const location = response.headers.get('location') ?? ''
+
+    expect(response.status).toBe(302)
+    expect(new URL(location).searchParams.get('redirect_uri'))
+      .toBe('https://localhost:7257/auth/google/callback')
+    expect(location).not.toContain('forged.example.test')
+    expect(state.authorizationUrl).toHaveBeenCalledTimes(1)
   })
 
   it('rejects provider failures and replays after a transaction has been consumed', async () => {

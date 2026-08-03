@@ -13,6 +13,7 @@ interface RecordedCommand {
 class RecordingSqlConnection implements AuthSqlConnection {
   readonly commands: RecordedCommand[] = []
   transactions = 0
+  failNextTransaction = false
 
   async query<T>(
     statement: string,
@@ -33,6 +34,10 @@ class RecordingSqlConnection implements AuthSqlConnection {
 
   async transaction<T>(operation: (connection: AuthSqlConnection) => Promise<T>): Promise<T> {
     this.transactions++
+    if (this.failNextTransaction) {
+      this.failNextTransaction = false
+      throw new Error('temporary schema provisioning failure')
+    }
     return operation(this)
   }
 }
@@ -102,5 +107,23 @@ describe('shared SQL authentication repositories', () => {
     expect(connection.commands[0]?.statement).toContain('WITH (UPDLOCK, HOLDLOCK)')
     expect(connection.commands[0]?.statement).toContain('Issuer = @issuer AND Subject = @subject')
     expect(connection.commands[0]?.parameters).not.toHaveProperty('email')
+  })
+
+  it('retries schema provisioning after a transient provisioning failure', async () => {
+    const connection = new RecordingSqlConnection()
+    connection.failNextTransaction = true
+    const connect = vi.fn(async () => connection)
+    const auth = createSqlAuthRepositories({
+      connectionString: 'Server=auth-store.invalid;Database=marion',
+      provisionSchema: true
+    }, random, connect)
+
+    await expect(auth.transactions.create('first-attempt', 1_750_000_000_000))
+      .rejects.toThrow('temporary schema provisioning failure')
+    await expect(auth.transactions.create('second-attempt', 1_750_000_000_000))
+      .resolves.toBeUndefined()
+
+    expect(connection.transactions).toBe(2)
+    expect(connection.commands[0]?.statement).toContain('CREATE TABLE dbo.MarionAuthTransactions')
   })
 })
