@@ -9,3 +9,4 @@
 ## Role Context
 
 Lois owns Nuxt frontend implementation, product interaction quality, and accessible user flows.
+📌 Team update (2026-08-01T10:27:14.327-05:00): Dedicated Nuxt Nitro auth routes outside the API proxy were adopted for Google sign-in — decided by Joe, Lois, Stewie.

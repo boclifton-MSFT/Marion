@@ -9,6 +9,13 @@ var integrationTesting = string.Equals(
     StringComparison.OrdinalIgnoreCase);
 
 var sql = builder.AddSqlServer("sql");
+if (!integrationTesting)
+{
+    sql.WithDataVolume()
+        .WithLifetime(ContainerLifetime.Persistent);
+}
+var marionDb = sql.AddDatabase("mariondb");
+
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(emulator =>
     {
@@ -22,6 +29,8 @@ var storage = builder.AddAzureStorage("storage")
             emulator.WithLifetime(ContainerLifetime.Session);
         }
     });
+var documents = storage.AddBlobContainer("documents", "test-files");
+
 var messaging = builder.AddAzureServiceBus("messaging")
     .RunAsEmulator(emulator =>
     {
@@ -41,14 +50,7 @@ var messaging = builder.AddAzureServiceBus("messaging")
         });
     });
 
-if (!integrationTesting)
-{
-    sql.WithDataVolume()
-        .WithLifetime(ContainerLifetime.Persistent);
-}
 
-var marionDb = sql.AddDatabase("mariondb");
-var documents = storage.AddBlobContainer("documents", "test-files");
 var documentProcessing = messaging.AddServiceBusQueue(
     "document-processing",
     "document-processing");
