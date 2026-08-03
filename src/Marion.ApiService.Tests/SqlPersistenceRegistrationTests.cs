@@ -10,6 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Xunit;
 
 namespace Marion.ApiService.Tests;
@@ -95,6 +99,44 @@ public sealed class SqlPersistenceRegistrationTests
     }
 
     [Fact]
+    public void SQL_client_tracing_is_registered_by_the_Aspire_registration()
+    {
+        var activities = new ConcurrentBag<Activity>();
+        using var host = BuildHost(
+            new Dictionary<string, string?>
+            {
+                [$"{PlatformOptions.SectionName}:Mode"] = "Local",
+                [$"{PlatformOptions.SectionName}:Local:BlobServiceUri"] =
+                    "https://storage.invalid",
+                [$"{PlatformOptions.SectionName}:Local:BlobContainerName"] = "documents",
+                [$"{PlatformOptions.SectionName}:Local:ServiceBusFullyQualifiedNamespace"] =
+                    "messaging.invalid",
+                ["ConnectionStrings:mariondb"] =
+                    "Data Source=local-sql;Initial Catalog=marion;Integrated Security=True;Encrypt=False"
+            },
+            builder =>
+            {
+                builder.AddServiceDefaults();
+                builder.Services.AddOpenTelemetry()
+                    .WithTracing(tracing =>
+                        tracing.AddProcessor(new RecordingActivityProcessor(activities)));
+                builder.AddMarionPersistence(settings => settings.DisableRetry = true);
+            });
+
+        _ = host.Services.GetRequiredService<TracerProvider>();
+        using var activity = new ActivitySource(
+                "OpenTelemetry.Instrumentation.SqlClient")
+            .StartActivity("sql-client-registration-check");
+
+        Assert.NotNull(activity);
+        activity.Stop();
+        Assert.Contains(
+            activities,
+            recordedActivity => recordedActivity.Source.Name ==
+                "OpenTelemetry.Instrumentation.SqlClient");
+    }
+
+    [Fact]
     public async Task SQL_readiness_is_bounded_without_marking_liveness_as_a_dependency()
     {
         using var host = BuildHost(
@@ -149,6 +191,12 @@ public sealed class SqlPersistenceRegistrationTests
         builder.AddPlatformConfiguration();
         configure(builder);
         return builder.Build();
+    }
+
+    private sealed class RecordingActivityProcessor(ConcurrentBag<Activity> activities)
+        : BaseProcessor<Activity>
+    {
+        public override void OnEnd(Activity data) => activities.Add(data);
     }
 
     private sealed class RecordingTokenCredential : TokenCredential

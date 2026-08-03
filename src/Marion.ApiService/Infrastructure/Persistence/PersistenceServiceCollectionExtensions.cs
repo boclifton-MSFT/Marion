@@ -1,5 +1,5 @@
-using System.Data.Common;
 using Azure.Core;
+using Aspire.Microsoft.EntityFrameworkCore.SqlServer;
 using Marion.ApiService.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -42,20 +42,7 @@ internal static class PersistenceServiceCollectionExtensions
                     serviceProvider.GetRequiredService<IConfiguration>(),
                     platform);
 
-                options.UseSqlServer(
-                    connectionString,
-                    sqlOptions =>
-                    {
-                        if (settings.CommandTimeoutSeconds is not null)
-                        {
-                            sqlOptions.CommandTimeout(settings.CommandTimeoutSeconds);
-                        }
-
-                        if (!settings.DisableRetry)
-                        {
-                            sqlOptions.EnableRetryOnFailure();
-                        }
-                    });
+                options.UseSqlServer(connectionString);
 
                 if (platform.Mode == PlatformMode.Azure)
                 {
@@ -64,34 +51,16 @@ internal static class PersistenceServiceCollectionExtensions
                 }
             });
 
+        builder.EnrichSqlServerDbContext<MarionDbContext>(sqlSettings =>
+        {
+            sqlSettings.DisableHealthChecks = settings.DisableHealthChecks;
+            sqlSettings.DisableRetry = settings.DisableRetry;
+            sqlSettings.DisableTracing = false;
+            sqlSettings.CommandTimeout = settings.CommandTimeoutSeconds;
+        });
+
         if (!settings.DisableHealthChecks)
         {
-            builder.Services
-                .AddHealthChecks()
-                .AddDbContextCheck<MarionDbContext>(
-                    name: nameof(MarionDbContext),
-                    failureStatus: HealthStatus.Unhealthy,
-                    tags: null,
-                    customTestQuery: static async (dbContext, cancellationToken) =>
-                    {
-                        try
-                        {
-                            return await dbContext.Database.CanConnectAsync(cancellationToken);
-                        }
-                        catch (DbException)
-                        {
-                            return false;
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            return false;
-                        }
-                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                        {
-                            return false;
-                        }
-                    });
-
             builder.Services.PostConfigure<HealthCheckServiceOptions>(options =>
             {
                 var registration = options.Registrations
