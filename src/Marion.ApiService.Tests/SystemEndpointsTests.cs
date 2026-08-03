@@ -65,19 +65,18 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
     public async Task Health_endpoints_return_a_documented_JSON_status(string path)
     {
         var response = await client.GetAsync(path);
-        using var payload = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
-        Assert.Equal(JsonValueKind.Object, payload.RootElement.ValueKind);
-        Assert.Single(payload.RootElement.EnumerateObject());
-        Assert.Equal("Healthy", payload.RootElement.GetProperty("status").GetString());
+        await AssertStatusOnlyJsonAsync(response, "Healthy");
     }
 
-    [Fact]
-    public async Task Health_endpoints_are_available_and_probe_safe_in_Production_when_a_dependency_fails()
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task Health_endpoints_are_available_and_probe_safe_outside_Development_when_a_dependency_fails(
+        string environmentName)
     {
-        using var productionFactory = new MarionApiFactory("Production").WithWebHostBuilder(builder =>
+        using var factory = new MarionApiFactory(environmentName).WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
                 services.AddHealthChecks().AddCheck(
@@ -97,19 +96,20 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
                     }
                 });
             }));
-        using var productionClient = productionFactory.CreateClient();
+        using var client = factory.CreateClient();
 
-        using var readyResponse = await productionClient.GetAsync("/health");
-        using var liveResponse = await productionClient.GetAsync("/alive");
-        var readyBody = await readyResponse.Content.ReadAsStringAsync();
-        var liveBody = await liveResponse.Content.ReadAsStringAsync();
+        using var readyResponse = await client.GetAsync("/health");
+        using var liveResponse = await client.GetAsync("/alive");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
-        Assert.Equal("""{"status":"Unhealthy"}""", readyBody);
-        Assert.Equal("""{"status":"Healthy"}""", liveBody);
+        var readyBody = await AssertStatusOnlyJsonAsync(readyResponse, "Unhealthy");
+        var liveBody = await AssertStatusOnlyJsonAsync(liveResponse, "Healthy");
         Assert.DoesNotContain("secret", readyBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("endpoint", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stack", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", liveBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -164,19 +164,13 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         using var liveResponse = await statusClient.GetAsync("/alive");
         using var dependenciesResponse =
             await statusClient.GetAsync("/api/system/dependencies");
-        using var readyPayload =
-            JsonDocument.Parse(await readyResponse.Content.ReadAsStreamAsync());
-        using var livePayload =
-            JsonDocument.Parse(await liveResponse.Content.ReadAsStreamAsync());
         var dependencies = await dependenciesResponse.Content
             .ReadFromJsonAsync<SystemDependenciesResponse>();
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
-        Assert.Equal("application/json", readyResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("Unhealthy", readyPayload.RootElement.GetProperty("status").GetString());
         Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
-        Assert.Equal("application/json", liveResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("Healthy", livePayload.RootElement.GetProperty("status").GetString());
+        var readyBody = await AssertStatusOnlyJsonAsync(readyResponse, "Unhealthy");
+        var liveBody = await AssertStatusOnlyJsonAsync(liveResponse, "Healthy");
         Assert.Equal(HttpStatusCode.OK, dependenciesResponse.StatusCode);
         Assert.NotNull(dependencies);
         Assert.Contains(dependencies.Dependencies, dependency =>
@@ -188,6 +182,9 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.DoesNotContain("redacted", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Blob endpoint", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Blob endpoint", liveBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -211,6 +208,8 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, readyResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, liveResponse.StatusCode);
+        var readyBody = await AssertStatusOnlyJsonAsync(readyResponse, "Unhealthy");
+        var liveBody = await AssertStatusOnlyJsonAsync(liveResponse, "Healthy");
         Assert.Equal(HttpStatusCode.OK, dependenciesResponse.StatusCode);
         Assert.NotNull(dependencies);
         Assert.Contains(dependencies.Dependencies, dependency =>
@@ -222,6 +221,9 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
         Assert.DoesNotContain("credential", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stack", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Service Bus endpoint", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", readyBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Service Bus endpoint", liveBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -258,5 +260,21 @@ public sealed class SystemEndpointsTests : IClassFixture<MarionApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.DoesNotContain("weather", rootBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task<string> AssertStatusOnlyJsonAsync(
+        HttpResponseMessage response,
+        string expectedHealthStatus)
+    {
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var payload = JsonDocument.Parse(body);
+
+        Assert.Equal(JsonValueKind.Object, payload.RootElement.ValueKind);
+        Assert.Single(payload.RootElement.EnumerateObject());
+        Assert.Equal(expectedHealthStatus, payload.RootElement.GetProperty("status").GetString());
+
+        return body;
     }
 }
