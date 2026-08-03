@@ -11,9 +11,15 @@ var integrationTesting = string.Equals(
 var googleClientId = builder.AddParameter("GoogleClientId");
 var googleClientSecret = builder.AddParameter("GoogleClientSecret", secret: true);
 
-var keyVault = builder.AddAzureKeyVault("marionkv");
-keyVault.AddSecret("google-client-id", googleClientId);
-keyVault.AddSecret("google-client-secret", googleClientSecret);
+var keyVault = integrationTesting
+    ? null
+    : builder.AddAzureKeyVault("marionkv");
+
+if (keyVault is not null)
+{
+    keyVault.AddSecret("google-client-id", googleClientId);
+    keyVault.AddSecret("google-client-secret", googleClientSecret);
+}
 
 var sql = builder.AddSqlServer("sql");
 var storage = builder.AddAzureStorage("storage")
@@ -66,7 +72,6 @@ var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WithEnvironment("Marion__Platform__Mode", "Local")
-    .WithReference(keyVault)
     .WithReference(marionDb)
     .WaitFor(marionDb)
     .WithReference(documents)
@@ -74,6 +79,11 @@ var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WithReference(messaging)
     .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
+
+if (keyVault is not null)
+{
+    apiService.WithReference(keyVault);
+}
 
 if (integrationTesting)
 {

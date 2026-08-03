@@ -1,5 +1,6 @@
 using Azure.Core;
 using Azure.Identity;
+using System.Data.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -17,7 +18,7 @@ public sealed class PlatformOptions
 {
     public const string SectionName = "Marion:Platform";
 
-    public PlatformMode Mode { get; set; } = PlatformMode.Local;
+    public PlatformMode Mode { get; set; } = PlatformMode.Unknown;
 
     public LocalPlatformOptions Local { get; set; } = new();
 
@@ -59,6 +60,12 @@ public sealed class AzureIdentityOptions
 
 internal static class PlatformConfigurationExtensions
 {
+    private const string LocalBlobResourceName = "documents";
+    private const string LocalMessagingResourceName = "messaging";
+    private const string LocalBlobServiceUriEnvironmentVariable = "DOCUMENTS_URI";
+    private const string LocalBlobContainerNameEnvironmentVariable = "DOCUMENTS_BLOBCONTAINERNAME";
+    private const string LocalServiceBusNamespaceEnvironmentVariable =
+        "MESSAGING_FULLYQUALIFIEDNAMESPACE";
     private const string LocalSqlConnectionName = "mariondb";
 
     internal static IHostApplicationBuilder AddPlatformConfiguration(
@@ -95,7 +102,7 @@ internal static class PlatformConfigurationExtensions
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return PlatformMode.Local;
+            return PlatformMode.Unknown;
         }
 
         var mode = value.Trim();
@@ -118,13 +125,81 @@ internal static class PlatformConfigurationExtensions
         if (options.Mode != PlatformMode.Azure)
         {
             options.Local.BlobServiceUri ??=
-                configuration["Aspire:Azure:Storage:Blobs:ServiceUri"];
+                GetBlobServiceUri(configuration);
             options.Local.BlobContainerName ??=
-                configuration["Aspire:Azure:Storage:Blobs:BlobContainerName"];
+                GetConnectionStringValue(
+                    configuration,
+                    LocalBlobResourceName,
+                    "ContainerName")
+                ?? configuration[LocalBlobContainerNameEnvironmentVariable];
             options.Local.ServiceBusFullyQualifiedNamespace ??=
-                configuration["Aspire:Azure:Messaging:ServiceBus:FullyQualifiedNamespace"];
+                GetServiceBusNamespace(configuration);
             options.Local.SqlConnectionName ??= LocalSqlConnectionName;
         }
+    }
+
+    private static string? GetBlobServiceUri(IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString(LocalBlobResourceName);
+        var serviceUri = GetConnectionStringValue(connectionString, "BlobEndpoint")
+            ?? GetConnectionStringValue(connectionString, "Endpoint");
+
+        return serviceUri ?? configuration[LocalBlobServiceUriEnvironmentVariable];
+    }
+
+    private static string? GetServiceBusNamespace(IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString(LocalMessagingResourceName);
+        var namespaceValue = GetConnectionStringValue(connectionString, "FullyQualifiedNamespace");
+        if (!string.IsNullOrWhiteSpace(namespaceValue))
+        {
+            return namespaceValue;
+        }
+
+        var endpoint = GetConnectionStringValue(connectionString, "Endpoint");
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
+            && endpointUri is not null)
+        {
+            return endpointUri.Host;
+        }
+
+        return configuration[LocalServiceBusNamespaceEnvironmentVariable];
+    }
+
+    private static string? GetConnectionStringValue(
+        IConfiguration configuration,
+        string connectionName,
+        string propertyName) =>
+        GetConnectionStringValue(configuration.GetConnectionString(connectionName), propertyName);
+
+    private static string? GetConnectionStringValue(
+        string? connectionString,
+        string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return null;
+        }
+
+        var value = connectionString!.Trim();
+        if (!value.Contains('='))
+        {
+            return null;
+        }
+
+        var builder = new DbConnectionStringBuilder();
+        try
+        {
+            builder.ConnectionString = value;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+
+        return builder.TryGetValue(propertyName, out var propertyValue)
+            ? propertyValue?.ToString()
+            : null;
     }
 }
 

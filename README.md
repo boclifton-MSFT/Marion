@@ -78,7 +78,7 @@ For future Azure hosting, keep the `documents` logical connection name and provi
 
 ### Dual-mode platform configuration
 
-The API binds `Marion:Platform` to a typed local/Azure contract. Local mode is the default for direct development and accepts Aspire-provided Blob and Service Bus endpoints plus the `mariondb` connection name. Aspire AppHost execution also sets `Marion__Platform__Mode=Local` explicitly.
+The API binds `Marion:Platform` to a typed local/Azure contract. The mode must be selected explicitly; the development configuration and Aspire AppHost set `Marion__Platform__Mode=Local`, while deployments select `Azure`. Local mode accepts the named Aspire `documents` and `messaging` resource properties plus the `mariondb` connection name. Missing or invalid mode fails sanitized startup validation.
 
 Azure mode requires an HTTPS Blob service URI, Blob container name, Service Bus fully qualified namespace, SQL server and database names, and an Entra tenant ID. An optional managed identity client ID selects a user-assigned identity; leaving it unset preserves the system-assigned identity path. Azure mode registers one shared `DefaultAzureCredential`, while local mode registers no Azure credential. Validation runs at startup and reports only setting names and mode requirements, never configured values.
 

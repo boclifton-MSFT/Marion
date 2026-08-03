@@ -11,12 +11,15 @@ var builder = WebApplication.CreateBuilder(args);
 var integrationTesting = builder.Environment.IsEnvironment("IntegrationTesting");
 
 builder.AddPlatformConfiguration();
-builder.AddAzureKeyVaultClient(
-    connectionName: "marionkv",
-    settings =>
-    {
-        settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
-    });
+if (!integrationTesting)
+{
+    builder.AddAzureKeyVaultClient(
+        connectionName: "marionkv",
+        settings =>
+        {
+            settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
+        });
+}
 
 if (integrationTesting)
 {

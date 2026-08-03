@@ -6,6 +6,13 @@ namespace Marion.ApiService.Tests;
 
 public sealed class MarionApiFactory : WebApplicationFactory<Program>
 {
+    internal static string[] IntegrationTestingArguments =>
+    [
+        "--IntegrationTesting=true",
+        "--Parameters:GoogleClientId=integration-test-client",
+        "--Parameters:GoogleClientSecret=integration-test-secret"
+    ];
+
     private readonly string environmentName;
 
     public MarionApiFactory()
@@ -31,15 +38,16 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
         }.ConnectionString;
 
         builder.UseEnvironment(environmentName);
+        builder.UseSetting("Marion:Platform:Mode", "Local");
         builder.UseSetting("ConnectionStrings:mariondb", connectionString);
         builder.UseSetting(
-            "Aspire:Azure:Storage:Blobs:ServiceUri",
-            "https://storage.invalid");
+            "ConnectionStrings:documents",
+            "Endpoint=https://storage.invalid;ContainerName=test-files");
         builder.UseSetting(
-            "Aspire:Azure:Storage:Blobs:BlobContainerName",
-            "test-files");
-        builder.UseSetting(
-            "Aspire:Azure:Messaging:ServiceBus:FullyQualifiedNamespace",
-            "messaging.invalid");
+            "ConnectionStrings:messaging",
+            "Endpoint=sb://messaging.invalid/;SharedAccessKeyName=test;SharedAccessKey=test");
+        builder.UseSetting("DOCUMENTS_URI", "https://storage.invalid");
+        builder.UseSetting("DOCUMENTS_BLOBCONTAINERNAME", "test-files");
+        builder.UseSetting("MESSAGING_FULLYQUALIFIEDNAMESPACE", "messaging.invalid");
     }
 }

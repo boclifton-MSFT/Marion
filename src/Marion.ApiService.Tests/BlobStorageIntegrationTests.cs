@@ -24,7 +24,7 @@ public sealed class BlobStorageIntegrationTests
         using var timeout = new CancellationTokenSource(TestTimeout);
         var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
-                ["--IntegrationTesting=true"],
+                MarionApiFactory.IntegrationTestingArguments,
                 timeout.Token);
 
         await using var app = await builder.BuildAsync(timeout.Token);
