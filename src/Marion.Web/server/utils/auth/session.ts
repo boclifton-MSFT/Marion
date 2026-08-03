@@ -102,6 +102,15 @@ export async function getActiveMarionSession(
 
   const activeSession = await dependencies.sessions.touch(storedSession, now)
   if (!activeSession) {
+    const currentSession = await dependencies.sessions.get(cookieSession.sessionId)
+    if (currentSession
+      && currentSession.userId === cookieSession.userId
+      && currentSession.issuedAt === cookieSession.issuedAt
+      && sessionIsActive(currentSession, now)) {
+      await writeCookieSession(event, currentSession, config)
+      return currentSession
+    }
+
     await clearCookieSession(event)
     return
   }

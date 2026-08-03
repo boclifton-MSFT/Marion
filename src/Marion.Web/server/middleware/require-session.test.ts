@@ -17,10 +17,22 @@ Object.assign(globalThis, {
   })
 })
 
-function createDependencies(): AuthDependencies {
+type TouchMode = 'stale' | 'revoked'
+
+function createDependencies(touchMode?: TouchMode) {
   const sessions = new Map<string, MarionSession>()
-  return {
-    clock: { now: () => 1_750_000_000_000 },
+  let now = 1_750_000_000_000
+  let resolveFirstTouchStarted: (() => void) | undefined
+  let resolveFirstTouch: (() => void) | undefined
+  const firstTouchStarted = new Promise<void>((resolve) => {
+    resolveFirstTouchStarted = resolve
+  })
+  const firstTouch = new Promise<void>((resolve) => {
+    resolveFirstTouch = resolve
+  })
+  let touches = 0
+  const dependencies: AuthDependencies = {
+    clock: { now: () => touchMode === 'stale' ? now += 1_000 : now },
     random: {
       uuid: () => 'session-id',
       state: () => 'state',
@@ -40,8 +52,22 @@ function createDependencies(): AuthDependencies {
       create: async (session) => { sessions.set(session.sessionId, session) },
       get: async sessionId => sessions.get(sessionId) ?? null,
       touch: async (session, now) => {
+        if (touchMode === 'revoked') {
+          sessions.delete(session.sessionId)
+          return null
+        }
+
+        if (touchMode === 'stale' && touches++ === 0) {
+          resolveFirstTouchStarted?.()
+          await firstTouch
+          if (sessions.get(session.sessionId)?.lastActiveAt !== session.lastActiveAt) {
+            return null
+          }
+        }
+
         const active = { ...session, lastActiveAt: now }
         sessions.set(active.sessionId, active)
+        resolveFirstTouch?.()
         return active
       },
       rotate: async (_previous, session) => { sessions.set(session.sessionId, session) },
@@ -51,10 +77,11 @@ function createDependencies(): AuthDependencies {
       resolve: async () => 'marion-user'
     }
   }
+  return { dependencies, firstTouchStarted }
 }
 
-async function startServer() {
-  const dependencies = createDependencies()
+async function startServer(touchMode?: TouchMode) {
+  const { dependencies, firstTouchStarted } = createDependencies(touchMode)
   const app = createApp()
   const router = createRouter()
   app.use(defineEventHandler((event) => {
@@ -80,6 +107,7 @@ async function startServer() {
 
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
+    firstTouchStarted,
     close: async () => new Promise<void>((resolve, reject) =>
       server.close(error => error ? reject(error) : resolve()))
   }
@@ -118,5 +146,35 @@ describe('protected SSR route middleware', () => {
     expect(anonymous.headers.get('location')).toBe('/login?returnTo=%2Fapp%2Ffuture-loan%3Ftab%3Ddetails')
     expect(authenticated.status).toBe(200)
     await expect(authenticated.json()).resolves.toEqual({ protected: true })
+  })
+
+  it('keeps a valid session signed in when a concurrent request has already touched it', async () => {
+    const server = await startServer('stale')
+    servers.push(server)
+
+    const seed = await fetch(`${server.baseUrl}/test/seed-session`)
+    const cookie = requestCookie(seed)
+    const first = fetch(`${server.baseUrl}/app/future-loan`, { headers: { cookie } })
+    await server.firstTouchStarted
+    const second = fetch(`${server.baseUrl}/app/future-loan`, { headers: { cookie } })
+    const [firstResponse, secondResponse] = await Promise.all([first, second])
+
+    expect(firstResponse.status).toBe(200)
+    expect(secondResponse.status).toBe(200)
+    expect(firstResponse.headers.get('set-cookie')).not.toContain('Max-Age=0')
+  })
+
+  it('still clears the cookie when the session is revoked while it is being touched', async () => {
+    const server = await startServer('revoked')
+    servers.push(server)
+
+    const seed = await fetch(`${server.baseUrl}/test/seed-session`)
+    const response = await fetch(`${server.baseUrl}/app/future-loan`, {
+      headers: { cookie: requestCookie(seed) },
+      redirect: 'manual'
+    })
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
   })
 })
