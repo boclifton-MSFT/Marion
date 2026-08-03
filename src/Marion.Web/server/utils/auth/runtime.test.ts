@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getAuthStoreSettings, getOidcSettings, getSessionPassword } from './runtime'
 
 const validConfig = {
+  apiBase: 'https://api.invalid',
   oauth: {
     oidc: {
       issuer: 'https://accounts.google.com',
@@ -14,8 +15,7 @@ const validConfig = {
     password: 'a'.repeat(32)
   },
   authStore: {
-    connectionString: 'Server=auth-store.invalid;Database=marion',
-    provisionSchema: true
+    bffKey: 'bff-key'
   }
 }
 
@@ -42,8 +42,12 @@ describe('private OIDC runtime configuration', () => {
     expect(getSessionPassword({ session: { password: 'short' } })).toBeUndefined()
   })
 
-  it('requires a private shared auth-store connection string', () => {
-    expect(getAuthStoreSettings(validConfig)).toEqual(validConfig.authStore)
-    expect(getAuthStoreSettings({ authStore: { connectionString: '  ' } })).toBeUndefined()
+  it('requires a private shared key and an API base for the auth store', () => {
+    expect(getAuthStoreSettings(validConfig)).toEqual({
+      apiBase: 'https://api.invalid',
+      bffKey: 'bff-key'
+    })
+    expect(getAuthStoreSettings({ ...validConfig, authStore: { bffKey: '  ' } })).toBeUndefined()
+    expect(getAuthStoreSettings({ ...validConfig, apiBase: '' })).toBeUndefined()
   })
 })

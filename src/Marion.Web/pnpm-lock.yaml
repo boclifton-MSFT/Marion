@@ -44,9 +44,6 @@ importers:
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
-      mssql:
-        specifier: ^12.7.0
-        version: 12.7.0(supports-color@10.2.2)
       nuxt:
         specifier: ^4.5.0
         version: 4.5.0(@azure/identity@4.13.1(supports-color@10.2.2))(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@types/node@26.1.1)(@vue/compiler-sfc@3.5.40)(better-sqlite3@12.11.1)(cac@7.0.0)(db0@0.3.4(better-sqlite3@12.11.1))(esbuild@0.28.1)(eslint@10.8.0(jiti@2.7.0)(supports-color@10.2.2))(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(magicast@0.5.3)(optionator@0.9.4)(oxc-parser@0.140.0)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.0)(rollup@4.62.2))(rollup@4.62.2)(srvx@0.11.22)(supports-color@10.2.2)(terser@5.49.0)(typescript@6.0.3)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))(vue-tsc@3.3.8(typescript@6.0.3))(yaml@2.9.0)
@@ -63,9 +60,6 @@ importers:
       '@nuxt/eslint':
         specifier: ^1.16.0
         version: 1.16.0(@typescript-eslint/utils@8.65.0(eslint@10.8.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(@vue/compiler-sfc@3.5.40)(esbuild@0.28.1)(eslint@10.8.0(jiti@2.7.0)(supports-color@10.2.2))(magic-string@1.1.0)(magicast@0.5.3)(oxc-parser@0.140.0)(rolldown@1.2.0)(rollup@4.62.2)(srvx@0.11.22)(supports-color@10.2.2)(typescript@6.0.3)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0)))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
-      '@types/mssql':
-        specifier: ^12.3.0
-        version: 12.3.0(supports-color@10.2.2)
       eslint:
         specifier: ^10.8.0
         version: 10.8.0(jiti@2.7.0)(supports-color@10.2.2)
@@ -94,10 +88,6 @@ packages:
     peerDependencies:
       '@types/json-schema': ^7.0.15
 
-  '@azure-rest/core-client@2.8.0':
-    resolution: {integrity: sha512-F1ybHeN+++QhyFCF/ehLUEvrOB6fehPdFBFtGdj0C3B2lpQ9zkPiO5JDgsqc6IfjuUe6b3dAbXK0a7+VgSGfhw==}
-    engines: {node: '>=22.0.0'}
-
   '@azure/abort-controller@2.2.0':
     resolution: {integrity: sha512-fNAjWnA/nZ2jz31kxR/AqRaUT8ewHBw/WuBIosK0moMy1C9e5ValbDfFdIxJzVOOYaYkV/b2F1S4H/aHiqfVQg==}
     engines: {node: '>=22.0.0'}
@@ -108,14 +98,6 @@ packages:
 
   '@azure/core-client@1.11.0':
     resolution: {integrity: sha512-JjQWO6akOck45PH/XBrxzsQGAiKrfFl4m5iggJ0ItMIz5omRufOXWpqCPpdjKN3vKDzlSUvFjaMb7Zwf0gvAdA==}
-    engines: {node: '>=22.0.0'}
-
-  '@azure/core-lro@2.7.2':
-    resolution: {integrity: sha512-0YIpccoX8m/k00O7mDDMdJpbr6mf1yWo2dfmxt5A8XVZVVMz2SSKaEbMCeJRvgQ0IaSlqhjT47p4hVIRRy90xw==}
-    engines: {node: '>=18.0.0'}
-
-  '@azure/core-paging@1.7.0':
-    resolution: {integrity: sha512-7GEAoIsaoBr6KELNRb8nypowCqvk8dnCHFCYg4XD4lOQGY2GqjQg5IhkRjyBFRO18CGSMq05PaNqSOE9GQro3g==}
     engines: {node: '>=22.0.0'}
 
   '@azure/core-rest-pipeline@1.25.0':
@@ -132,14 +114,6 @@ packages:
 
   '@azure/identity@4.13.1':
     resolution: {integrity: sha512-5C/2WD5Vb1lHnZS16dNQRPMjN6oV/Upba+C9nBIs15PmOi6A3ZGs4Lr2u60zw4S04gi+u3cEXiqTVP7M4Pz3kw==}
-    engines: {node: '>=20.0.0'}
-
-  '@azure/keyvault-common@2.1.0':
-    resolution: {integrity: sha512-aCDidWuKY06LWQ4x7/8TIXK6iRqTaRWRL3t7T+LC+j1b07HtoIsOxP/tU90G4jCSBn5TAyUTCtA4MS/y5Hudaw==}
-    engines: {node: '>=20.0.0'}
-
-  '@azure/keyvault-keys@4.10.2':
-    resolution: {integrity: sha512-VmUSLbXRAbSzDD8grXHGPaknYs0SKr3yuf6U+d4XMpX4XuVYskNqbTTwXce0zR1LyxfTZm9rWEBcvs3vdYwCmQ==}
     engines: {node: '>=20.0.0'}
 
   '@azure/logger@1.4.0':
@@ -1005,9 +979,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@js-joda/core@6.1.0':
-    resolution: {integrity: sha512-H8NTMRDJqad/leyv/D/A3kSOsf5/58Ydj4DJGDyaCWk9OU/zuZOLhndVffJgQjsgrn5GC0znHMHie7TfvPPG4w==}
 
   '@json-render/core@0.19.0':
     resolution: {integrity: sha512-vvcyZ+10EDZKbEyB1J2kXOGfDaiZR2LurZGSqi2r5STHyKr+Te85DWaBxTwRGgM7U1LtIvNx85BzzjElRKoAIg==}
@@ -2298,9 +2269,6 @@ packages:
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
 
-  '@tediousjs/connection-string@1.1.0':
-    resolution: {integrity: sha512-z9ZBWEG+8pIB5V1zYzlRPXx0oRJ5H7coPnMQK8EZOw03UTPI9Umn6viL36f5w+CuqkKsnCM50RVStpjZmR0Bng==}
-
   '@tiptap/core@3.29.0':
     resolution: {integrity: sha512-A/lrhKpOYtl0V5pmPS00Zps8pgBe1qDOoD9fzsumDSZ3HP8W398C959Jgru75PNFokAya9COPD3iaKP3NWF25g==}
     peerDependencies:
@@ -2553,18 +2521,12 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/mssql@12.3.0':
-    resolution: {integrity: sha512-+jy+AJtfuTDI5+nhh0hDNcir1p8P+pf+qsHXpUpYvg7EikxUUePBe+a+Kr6j/Xs89o4EbHlVzrh0HOxbqWM31Q==}
-
   '@types/node@26.1.1':
     resolution: {integrity: sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==}
 
   '@types/parse-path@7.1.0':
     resolution: {integrity: sha512-EULJ8LApcVEPbrfND0cRQqutIOdiIgJ1Mgrhpy755r14xMohPTEpkV/k28SJvuOs9bHRFW8x+KeDAEPiGQPB9Q==}
     deprecated: This is a stub types definition. parse-path provides its own type definitions, so you do not need this installed.
-
-  '@types/readable-stream@4.0.24':
-    resolution: {integrity: sha512-NRvUNC/JFGPJvqdAfEve8oginbM6V08u5NzLWpG8MwA2kTPOLnqk+wpwuPT+mp3aUsxyuT6m2gnrPuHYCruzEg==}
 
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
@@ -3177,9 +3139,6 @@ packages:
 
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
-
-  bl@6.1.6:
-    resolution: {integrity: sha512-jLsPgN/YSvPUg9UX0Kd73CXpm2Psg9FxMeCSXnk3WBO3CMT10JMwijubhGfHCnFu6TPn1ei3b975dxv7K2pWVg==}
 
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
@@ -4300,10 +4259,6 @@ packages:
     resolution: {integrity: sha512-AXcZb6vzzrFAUE61HnN4mpLqd/cSIwNQjtNWR0euPm6y0iqx3G4gOXaIDdtdDwZmhwe82LA6+zinmW4UBWVePQ==}
     engines: {node: '>=16.17.0'}
 
-  iconv-lite@0.7.3:
-    resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
-    engines: {node: '>=0.10.0'}
-
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
@@ -4487,9 +4442,6 @@ packages:
 
   jose@6.2.7:
     resolution: {integrity: sha512-hq1OB1bALKfydZNoViyg6hPVGV4i93ny9Op+n4zP5RSf7SCZEXa/TsG2O3IEr7+WlHRTPnpqDmHfMH6qXAD60w==}
-
-  js-md4@0.3.2:
-    resolution: {integrity: sha512-/GDnfQYsltsjRswQhN9fhv3EMw2sCpUdrdxyWDOUK7eyD++r3gRhzgiQgc/x4MAv2i1iuQ4lxO5mvqM3vj4bwA==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -5027,11 +4979,6 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  mssql@12.7.0:
-    resolution: {integrity: sha512-J6SJKXi1jYbhHjjooLNtPnX7+s3cq5IJ701Wgy/UW1SXRpgFlJJsYi3IPve9RVgCUkq0Cqv2aaaSJ4IXtIF3mg==}
-    engines: {node: '>=18.19.0'}
-    hasBin: true
-
   muggle-string@0.4.1:
     resolution: {integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==}
 
@@ -5050,9 +4997,6 @@ packages:
     resolution: {integrity: sha512-PHI5f1O0EP5xJ9gQmFGMS6IZcrVvTjpXjz7Na41gTE7eE2hK11lg04CECCYEEjdc17EV4DO+fkGEtt7TpTaTiQ==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     hasBin: true
-
-  native-duplexpair@1.0.0:
-    resolution: {integrity: sha512-E7QQoM+3jvNtlmyfqRZ0/U75VFgCls+fSkbml2MpgWkWyz3ox8Y58gNhfuziuQYGNNQAbFZJQck55LHCnCK6CA==}
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
@@ -5864,9 +5808,6 @@ packages:
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
 
-  safer-buffer@2.1.2:
-    resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
-
   sax@1.6.0:
     resolution: {integrity: sha512-6R3J5M4AcbtLUdZmRv2SygeVaM7IhrLXu9BmnOGmmACak8fiUtOsYNWUS4uK7upbmHIBbLBeFeI//477BKLBzA==}
     engines: {node: '>=11.0.0'}
@@ -6024,9 +5965,6 @@ packages:
   spdx-license-ids@3.0.23:
     resolution: {integrity: sha512-CWLcCCH7VLu13TgOH+r8p1O/Znwhqv/dbb6lqWy67G+pT1kHmeD/+V36AVb/vq8QMIQwVShJ6Ssl5FPh0fuSdw==}
 
-  sprintf-js@1.1.3:
-    resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
-
   srvx@0.11.22:
     resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==}
     engines: {node: '>=20.16.0'}
@@ -6158,14 +6096,6 @@ packages:
   tar@7.5.22:
     resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
     engines: {node: '>=18'}
-
-  tarn@3.1.2:
-    resolution: {integrity: sha512-3RTvqKZcK/17jnJ8rMKFXbyNogywTs1z0gVPPwFsJGX46rkmUHOdIaSQ/aVO1rS7nH+soiXiWk7rvUXxndm8Dg==}
-    engines: {node: '>=8.0.0'}
-
-  tedious@20.0.0:
-    resolution: {integrity: sha512-bTR0aou0Ghucf0ytvZUJjnKHGKDV8tT57jPYtEkSpfTWFe++4uR1wxJLQ4mh5wlSvAYXzmgBxbI0vaE56qigXw==}
-    engines: {node: '>=22'}
 
   terser@5.49.0:
     resolution: {integrity: sha512-SNiDnXyHSrxVcIOtVbULzcTmniUiwcV7Nwdyj1twVubeTmbjoa8p69KKDpfkdoOavuM4/GRm1+ykI8qqnavHoA==}
@@ -6942,20 +6872,10 @@ snapshots:
       '@types/json-schema': 7.0.15
       js-yaml: 4.3.0
 
-  '@azure-rest/core-client@2.8.0(supports-color@10.2.2)':
-    dependencies:
-      '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0(supports-color@10.2.2)
-      '@azure/core-rest-pipeline': 1.25.0(supports-color@10.2.2)
-      '@azure/core-tracing': 1.4.0
-      '@typespec/ts-http-runtime': 0.3.8(supports-color@10.2.2)
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@azure/abort-controller@2.2.0':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@azure/core-auth@1.11.0(supports-color@10.2.2)':
     dependencies:
@@ -6964,6 +6884,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-client@1.11.0(supports-color@10.2.2)':
     dependencies:
@@ -6976,19 +6897,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
-
-  '@azure/core-lro@2.7.2(supports-color@10.2.2)':
-    dependencies:
-      '@azure/abort-controller': 2.2.0
-      '@azure/core-util': 1.14.0(supports-color@10.2.2)
-      '@azure/logger': 1.4.0(supports-color@10.2.2)
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@azure/core-paging@1.7.0':
-    dependencies:
-      tslib: 2.8.1
+    optional: true
 
   '@azure/core-rest-pipeline@1.25.0(supports-color@10.2.2)':
     dependencies:
@@ -7001,10 +6910,12 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/core-tracing@1.4.0':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@azure/core-util@1.14.0(supports-color@10.2.2)':
     dependencies:
@@ -7013,6 +6924,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/identity@4.13.1(supports-color@10.2.2)':
     dependencies:
@@ -7029,35 +6941,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
-
-  '@azure/keyvault-common@2.1.0(supports-color@10.2.2)':
-    dependencies:
-      '@azure-rest/core-client': 2.8.0(supports-color@10.2.2)
-      '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0(supports-color@10.2.2)
-      '@azure/core-rest-pipeline': 1.25.0(supports-color@10.2.2)
-      '@azure/core-tracing': 1.4.0
-      '@azure/core-util': 1.14.0(supports-color@10.2.2)
-      '@azure/logger': 1.4.0(supports-color@10.2.2)
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@azure/keyvault-keys@4.10.2(supports-color@10.2.2)':
-    dependencies:
-      '@azure-rest/core-client': 2.8.0(supports-color@10.2.2)
-      '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0(supports-color@10.2.2)
-      '@azure/core-lro': 2.7.2(supports-color@10.2.2)
-      '@azure/core-paging': 1.7.0
-      '@azure/core-rest-pipeline': 1.25.0(supports-color@10.2.2)
-      '@azure/core-tracing': 1.4.0
-      '@azure/core-util': 1.14.0(supports-color@10.2.2)
-      '@azure/keyvault-common': 2.1.0(supports-color@10.2.2)
-      '@azure/logger': 1.4.0(supports-color@10.2.2)
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
+    optional: true
 
   '@azure/logger@1.4.0(supports-color@10.2.2)':
     dependencies:
@@ -7065,17 +6949,21 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@azure/msal-browser@5.17.3':
     dependencies:
       '@azure/msal-common': 16.11.3
+    optional: true
 
-  '@azure/msal-common@16.11.3': {}
+  '@azure/msal-common@16.11.3':
+    optional: true
 
   '@azure/msal-node@5.4.3':
     dependencies:
       '@azure/msal-common': 16.11.3
       jsonwebtoken: 9.0.3
+    optional: true
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -7821,8 +7709,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
-
-  '@js-joda/core@6.1.0': {}
 
   '@json-render/core@0.19.0(zod@4.4.3)':
     dependencies:
@@ -9416,8 +9302,6 @@ snapshots:
       '@tanstack/virtual-core': 3.17.6
       vue: 3.5.40(typescript@6.0.3)
 
-  '@tediousjs/connection-string@1.1.0': {}
-
   '@tiptap/core@3.29.0(@tiptap/pm@3.29.0)':
     dependencies:
       '@tiptap/pm': 3.29.0
@@ -9679,14 +9563,6 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/mssql@12.3.0(supports-color@10.2.2)':
-    dependencies:
-      '@types/node': 26.1.1
-      tarn: 3.1.2
-      tedious: 20.0.0(supports-color@10.2.2)
-    transitivePeerDependencies:
-      - supports-color
-
   '@types/node@26.1.1':
     dependencies:
       undici-types: 8.3.0
@@ -9694,10 +9570,6 @@ snapshots:
   '@types/parse-path@7.1.0':
     dependencies:
       parse-path: 7.1.0
-
-  '@types/readable-stream@4.0.24':
-    dependencies:
-      '@types/node': 26.1.1
 
   '@types/resolve@1.20.2': {}
 
@@ -9807,6 +9679,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@ungap/structured-clone@1.3.3': {}
 
@@ -10372,13 +10245,6 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  bl@6.1.6:
-    dependencies:
-      '@types/readable-stream': 4.0.24
-      buffer: 6.0.3
-      inherits: 2.0.4
-      readable-stream: 4.7.0
-
   boolbase@1.0.0: {}
 
   brace-expansion@5.0.8:
@@ -10399,7 +10265,8 @@ snapshots:
 
   buffer-crc32@1.0.0: {}
 
-  buffer-equal-constant-time@1.0.1: {}
+  buffer-equal-constant-time@1.0.1:
+    optional: true
 
   buffer-from@1.1.2: {}
 
@@ -10799,6 +10666,7 @@ snapshots:
   ecdsa-sig-formatter@1.0.11:
     dependencies:
       safe-buffer: 5.2.1
+    optional: true
 
   ee-first@1.1.1: {}
 
@@ -11645,6 +11513,7 @@ snapshots:
       debug: 4.4.3(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   http-shutdown@1.2.2: {}
 
@@ -11658,10 +11527,6 @@ snapshots:
   httpxy@0.5.5: {}
 
   human-signals@5.0.0: {}
-
-  iconv-lite@0.7.3:
-    dependencies:
-      safer-buffer: 2.1.2
 
   ieee754@1.2.1: {}
 
@@ -11870,8 +11735,6 @@ snapshots:
 
   jose@6.2.7: {}
 
-  js-md4@0.3.2: {}
-
   js-tokens@10.0.0: {}
 
   js-tokens@4.0.0: {}
@@ -11911,17 +11774,20 @@ snapshots:
       lodash.once: 4.1.1
       ms: 2.1.3
       semver: 7.8.5
+    optional: true
 
   jwa@2.0.1:
     dependencies:
       buffer-equal-constant-time: 1.0.1
       ecdsa-sig-formatter: 1.0.11
       safe-buffer: 5.2.1
+    optional: true
 
   jws@4.0.1:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
+    optional: true
 
   keyv@4.5.4:
     dependencies:
@@ -12095,19 +11961,26 @@ snapshots:
     dependencies:
       p-locate: 6.0.0
 
-  lodash.includes@4.3.0: {}
+  lodash.includes@4.3.0:
+    optional: true
 
-  lodash.isboolean@3.0.3: {}
+  lodash.isboolean@3.0.3:
+    optional: true
 
-  lodash.isinteger@4.0.4: {}
+  lodash.isinteger@4.0.4:
+    optional: true
 
-  lodash.isnumber@3.0.3: {}
+  lodash.isnumber@3.0.3:
+    optional: true
 
-  lodash.isplainobject@4.0.6: {}
+  lodash.isplainobject@4.0.6:
+    optional: true
 
-  lodash.isstring@4.0.1: {}
+  lodash.isstring@4.0.1:
+    optional: true
 
-  lodash.once@4.1.1: {}
+  lodash.once@4.1.1:
+    optional: true
 
   lodash@4.18.1: {}
 
@@ -12556,16 +12429,6 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mssql@12.7.0(supports-color@10.2.2):
-    dependencies:
-      '@tediousjs/connection-string': 1.1.0
-      commander: 11.1.0
-      debug: 4.4.3(supports-color@10.2.2)
-      tarn: 3.1.2
-      tedious: 20.0.0(supports-color@10.2.2)
-    transitivePeerDependencies:
-      - supports-color
-
   muggle-string@0.4.1: {}
 
   nanoid@3.3.16: {}
@@ -12575,8 +12438,6 @@ snapshots:
   napi-build-utils@2.0.0: {}
 
   napi-postinstall@0.3.4: {}
-
-  native-duplexpair@1.0.0: {}
 
   natural-compare@1.4.0: {}
 
@@ -13087,6 +12948,7 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
+    optional: true
 
   open@11.0.0:
     dependencies:
@@ -13915,8 +13777,6 @@ snapshots:
 
   safe-buffer@5.2.1: {}
 
-  safer-buffer@2.1.2: {}
-
   sax@1.6.0: {}
 
   scslre@0.3.0:
@@ -14121,8 +13981,6 @@ snapshots:
 
   spdx-license-ids@3.0.23: {}
 
-  sprintf-js@1.1.3: {}
-
   srvx@0.11.22: {}
 
   stable-hash-x@0.2.0: {}
@@ -14262,23 +14120,6 @@ snapshots:
       minipass: 7.1.3
       minizlib: 3.1.0
       yallist: 5.0.0
-
-  tarn@3.1.2: {}
-
-  tedious@20.0.0(supports-color@10.2.2):
-    dependencies:
-      '@azure/core-auth': 1.11.0(supports-color@10.2.2)
-      '@azure/identity': 4.13.1(supports-color@10.2.2)
-      '@azure/keyvault-keys': 4.10.2(supports-color@10.2.2)
-      '@js-joda/core': 6.1.0
-      '@types/node': 26.1.1
-      bl: 6.1.6
-      iconv-lite: 0.7.3
-      js-md4: 0.3.2
-      native-duplexpair: 1.0.0
-      sprintf-js: 1.1.3
-    transitivePeerDependencies:
-      - supports-color
 
   terser@5.49.0:
     dependencies:
@@ -14972,6 +14813,7 @@ snapshots:
   wsl-utils@0.1.0:
     dependencies:
       is-wsl: 3.1.0
+    optional: true
 
   wsl-utils@0.3.1:
     dependencies:

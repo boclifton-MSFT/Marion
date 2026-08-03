@@ -20,6 +20,8 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
 
     public string DatabaseName { get; } = $"marion-test-{Guid.NewGuid():N}";
 
+    internal const string BffKey = "test-bff-key-sentinel";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var connectionString = new SqlConnectionStringBuilder
@@ -32,6 +34,10 @@ public sealed class MarionApiFactory : WebApplicationFactory<Program>
 
         builder.UseEnvironment(environmentName);
         builder.UseSetting("ConnectionStrings:mariondb", connectionString);
+        builder.UseSetting("Auth:BffKey", BffKey);
+
+        // The in-memory host points at an unreachable database, so it must not migrate.
+        builder.UseSetting("Database:ApplyMigrations", "false");
         builder.UseSetting(
             "Aspire:Azure:Storage:Blobs:ServiceUri",
             "https://storage.invalid");

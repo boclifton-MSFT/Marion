@@ -1,5 +1,6 @@
 #pragma warning disable ASPIRECERTIFICATES001
 
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -7,6 +8,13 @@ var integrationTesting = string.Equals(
     builder.Configuration["IntegrationTesting"],
     "true",
     StringComparison.OrdinalIgnoreCase);
+
+// Shared secret that lets the API distinguish the trusted BFF from any other caller.
+var bffKey = builder.AddParameter(
+    "bff-key",
+    builder.Configuration["Parameters:bff-key"]
+        ?? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+    secret: true);
 
 var sql = builder.AddSqlServer("sql");
 if (!integrationTesting)
@@ -66,6 +74,7 @@ var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WaitFor(documents)
     .WithReference(messaging)
     .WaitFor(messaging)
+    .WithEnvironment("Auth__BffKey", bffKey)
     .WithHttpHealthCheck("/health");
 
 if (integrationTesting)
@@ -79,12 +88,10 @@ else
         .WithHttpsEndpoint(port: 7257, env: "PORT")
         .WithHttpsDeveloperCertificate()
         .WithExternalHttpEndpoints()
-        .WithReference(marionDb)
-        .WaitFor(marionDb)
         .WithReference(apiService)
         .WaitFor(apiService)
         .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"))
-        .WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true");
+        .WithEnvironment("NUXT_AUTH_BFF_KEY", bffKey);
 }
 
 builder.Build().Run();

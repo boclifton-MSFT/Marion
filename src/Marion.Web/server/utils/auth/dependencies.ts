@@ -10,7 +10,7 @@ import type {
   IdentityRepository,
   SessionRevocationStore
 } from './storage'
-import { createSqlAuthRepositories } from './sql'
+import { createHttpAuthRepositories } from './http'
 
 export type AuthTelemetryEvent
   = 'authorization-start-failed'
@@ -73,10 +73,10 @@ function unavailableRepositories(): AuthRepositories {
   }
 }
 
-function sqlRepositories(event: H3Event): AuthRepositories {
+function authRepositories(event: H3Event): AuthRepositories {
   const settings = getAuthStoreSettings(authRuntimeConfig(event))
   return settings
-    ? createSqlAuthRepositories(settings, systemRandom)
+    ? createHttpAuthRepositories(settings)
     : unavailableRepositories()
 }
 
@@ -91,7 +91,7 @@ export function getAuthDependencies(event: H3Event): AuthDependencies {
     return override
   }
 
-  const repositories = sqlRepositories(event)
+  const repositories = authRepositories(event)
   return {
     clock: systemClock,
     random: systemRandom,

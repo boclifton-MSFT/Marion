@@ -8,11 +8,12 @@ export interface OidcRuntimeSettings {
 }
 
 export interface AuthStoreRuntimeSettings {
-  connectionString: string
-  provisionSchema: boolean
+  apiBase: string
+  bffKey: string
 }
 
 interface RuntimeConfigShape {
+  apiBase?: unknown
   oauth?: {
     oidc?: Partial<OidcRuntimeSettings>
   }
@@ -20,8 +21,7 @@ interface RuntimeConfigShape {
     password?: unknown
   }
   authStore?: {
-    connectionString?: unknown
-    provisionSchema?: unknown
+    bffKey?: unknown
   }
 }
 
@@ -89,14 +89,18 @@ export function getOidcSettings(config: RuntimeConfigShape): OidcRuntimeSettings
 export function getAuthStoreSettings(
   config: RuntimeConfigShape
 ): AuthStoreRuntimeSettings | undefined {
-  const connectionString = config.authStore?.connectionString
-  if (typeof connectionString !== 'string' || !connectionString.trim()) {
+  const bffKey = config.authStore?.bffKey
+  const apiBase = config.apiBase
+  if (typeof bffKey !== 'string'
+    || !bffKey.trim()
+    || typeof apiBase !== 'string'
+    || !apiBase.trim()) {
     return
   }
 
   return {
-    connectionString,
-    provisionSchema: config.authStore?.provisionSchema === true
+    apiBase,
+    bffKey
   }
 }
 

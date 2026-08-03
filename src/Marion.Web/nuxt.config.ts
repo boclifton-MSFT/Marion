@@ -41,10 +41,7 @@ export default defineNuxtConfig({
       }
     },
     authStore: {
-      connectionString: process.env.NUXT_AUTH_STORE_CONNECTION_STRING
-        || process.env.ConnectionStrings__mariondb
-        || '',
-      provisionSchema: process.env.NUXT_AUTH_STORE_PROVISION_SCHEMA === 'true'
+      bffKey: process.env.NUXT_AUTH_BFF_KEY || ''
     }
   },
 

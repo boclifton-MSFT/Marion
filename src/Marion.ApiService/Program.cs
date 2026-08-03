@@ -1,8 +1,10 @@
+using Marion.ApiService.Features.Auth;
 using Marion.ApiService.Features.System;
 using Marion.ApiService.Infrastructure.Messaging;
 using Marion.ApiService.Infrastructure.Persistence;
 using Marion.ApiService.Infrastructure.Storage;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -60,6 +62,8 @@ builder.AddAzureServiceBusClient(
         }
     });
 builder.Services.AddPlatformIntegrationPublisher();
+builder.Services.AddAuthPersistence();
+builder.Services.AddSingleton<BffKeyValidator>();
 
 if (integrationTesting)
 {
@@ -79,6 +83,7 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
+app.UseBffIdentity();
 
 if (app.Environment.IsDevelopment())
 {
@@ -86,7 +91,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapSystemEndpoints(app.Environment);
+app.MapInternalAuthEndpoints();
 app.MapDefaultEndpoints();
+
+if (builder.Configuration.GetValue(
+        "Database:ApplyMigrations",
+        app.Environment.IsDevelopment() || integrationTesting))
+{
+    // Schema is applied before the health endpoint answers so dependents can gate on readiness.
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    await migrationScope.ServiceProvider
+        .GetRequiredService<MarionDbContext>()
+        .Database
+        .MigrateAsync();
+}
 
 app.Run();
 

@@ -21,7 +21,6 @@
     "@takumi-rs/core": "2.5.0",
     "@vueuse/nuxt": "^14.3.0",
     "better-sqlite3": "^12.11.1",
-    "mssql": "^12.7.0",
     "nuxt": "^4.5.0",
     "nuxt-og-image": "^6.7.4",
     "openid-client": "6.8.4",
@@ -29,7 +28,6 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.16.0",
-    "@types/mssql": "^12.3.0",
     "eslint": "^10.8.0",
     "typescript": "^6.0.3",
     "vitest": "4.1.0",

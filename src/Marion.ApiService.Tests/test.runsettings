@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Container-backed tests each boot a full distributed application (~70s). They are excluded
+         by default; run them with the sibling integration.runsettings file. A command line filter
+         is combined with this one rather than replacing it, so it cannot re-include them. -->
+    <TestCaseFilter>Category!=Integration</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>

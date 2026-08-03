@@ -9,8 +9,15 @@ import {
   setResponseHeader,
   setResponseStatus
 } from 'h3'
+import { getAuthDependencies } from '../utils/auth/dependencies'
+import { authRuntimeConfig, getAuthStoreSettings } from '../utils/auth/runtime'
+import { getActiveMarionSession } from '../utils/auth/session'
+
+const BFF_KEY_HEADER = 'x-marion-bff-key'
+const USER_ID_HEADER = 'x-marion-user-id'
 
 const forwardedMethods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+// Deliberately excludes the identity headers so a client can never assert its own user.
 const forwardedRequestHeaders = [
   'accept',
   'authorization',
@@ -64,10 +71,22 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  const authStore = getAuthStoreSettings(authRuntimeConfig(event))
+  if (authStore) {
+    try {
+      const session = await getActiveMarionSession(event, getAuthDependencies(event))
+      if (session) {
+        headers.set(BFF_KEY_HEADER, authStore.bffKey)
+        headers.set(USER_ID_HEADER, session.userId)
+      }
+    } catch {
+      // An unverifiable session is forwarded as anonymous rather than assumed valid.
+    }
+  }
+
   const body = method === 'GET' || method === 'HEAD'
     ? undefined
     : await readRawBody(event)
-
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetch(upstreamUrl, {

@@ -15,6 +15,7 @@ if (!globalThis.crypto) {
 
 const sessionPassword = 's'.repeat(32)
 const runtimeConfig = {
+  apiBase: 'https://api.invalid',
   oauth: {
     oidc: {
       issuer: 'https://accounts.google.com',
@@ -27,8 +28,7 @@ const runtimeConfig = {
     password: sessionPassword
   },
   authStore: {
-    connectionString: 'Server=auth-store.invalid;Database=marion',
-    provisionSchema: false
+    bffKey: 'bff-key-sentinel'
   }
 }
 

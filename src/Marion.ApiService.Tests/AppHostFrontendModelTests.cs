@@ -19,6 +19,7 @@ public sealed class AppHostFrontendModelTests
 
         var frontend = Assert.Single(builder.Resources, resource => resource.Name == "frontend");
         var database = Assert.Single(builder.Resources, resource => resource.Name == "mariondb");
+        var api = Assert.Single(builder.Resources, resource => resource.Name == "apiservice");
         var endpoint = Assert.Single(
             frontend.Annotations.OfType<EndpointAnnotation>(),
             annotation => annotation.Name == "https");
@@ -29,12 +30,17 @@ public sealed class AppHostFrontendModelTests
         Assert.True(endpoint.TlsEnabled);
         Assert.True(endpoint.IsExternal);
         Assert.True(certificate.UseDeveloperCertificate);
+
+        // Auth state is reached through the API, so the browser tier holds no database credentials.
+        Assert.DoesNotContain(
+            frontend.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            annotation => annotation.Resource == database);
         Assert.Contains(
             frontend.Annotations.OfType<ResourceRelationshipAnnotation>(),
-            annotation => annotation.Resource == database
+            annotation => annotation.Resource == api
                 && annotation.Type == "Reference");
         Assert.Contains(
             frontend.Annotations.OfType<WaitAnnotation>(),
-            annotation => annotation.Resource == database);
+            annotation => annotation.Resource == api);
     }
 }

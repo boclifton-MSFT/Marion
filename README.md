@@ -82,9 +82,9 @@ Keep the `mariondb` logical connection name when replacing the local SQL resourc
 
 ### Authentication persistence
 
-Google sign-in uses the same shared `mariondb` database for server-only authorization transactions, sessions, and `(issuer, sub)` identity mappings. Aspire gives the Nuxt **server** a database reference and enables local schema provisioning; the browser receives neither the connection nor any provider credential.
+Google sign-in state lives in the shared `mariondb` database, but only the API talks to it. The Nuxt server runs the OAuth flow and owns the `__Host-` cookies, then calls the API's internal `/internal/auth/*` surface for authorization transactions, sessions, and `(issuer, sub)` identity mappings. Those routes sit outside `/api`, so the frontend's API proxy cannot expose them to a browser, and they require the shared `Auth__BffKey` secret that Aspire injects into both processes. The browser receives neither a database connection nor any provider credential, and the Nuxt process holds no SQL credentials at all.
 
-Production operators must supply `NUXT_AUTH_STORE_CONNECTION_STRING` through their deployment secret mechanism, provision the `MarionAuthTransactions`, `MarionAuthSessions`, and `MarionExternalIdentities` tables in a controlled one-time migration/provisioning run, then keep `NUXT_AUTH_STORE_PROVISION_SCHEMA` disabled on runtime replicas. Use a shared transactional SQL Server/Azure SQL database with a least-privilege principal. Process-local Nitro storage, local files, and per-replica SQLite are not supported because they cannot guarantee replay prevention, session revocation, or identity uniqueness across restarts and replicas.
+The API owns the schema through EF Core migrations. Local and integration runs apply them at startup before the health endpoint reports ready; set `Database__ApplyMigrations` to `false` on runtime replicas that must not run DDL, and apply migrations as a controlled deployment step instead. Production operators supply `NUXT_AUTH_BFF_KEY` to the frontend and a matching `Auth__BffKey` to the API through their deployment secret mechanism, backed by a shared transactional SQL Server/Azure SQL database with a least-privilege principal. Process-local Nitro storage, local files, and per-replica SQLite are not supported because they cannot guarantee replay prevention, session revocation, or identity uniqueness across restarts and replicas.
 
 ### Common commands
 
@@ -92,8 +92,11 @@ Production operators must supply `NUXT_AUTH_STORE_CONNECTION_STRING` through the
 # Build the .NET solution
 dotnet build src\Marion.slnx
 
-# Run .NET tests
+# Run .NET tests (fast; excludes container-backed integration tests)
 dotnet test src\Marion.slnx
+
+# Run the integration tests (boots real containers; takes several minutes)
+dotnet test src\Marion.slnx --settings src\Marion.ApiService.Tests\integration.runsettings
 
 # Check the frontend
 Set-Location src\Marion.Web
