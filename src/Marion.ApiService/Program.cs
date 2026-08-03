@@ -9,6 +9,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 var builder = WebApplication.CreateBuilder(args);
 var integrationTesting = builder.Environment.IsEnvironment("IntegrationTesting");
 
+builder.AddAzureKeyVaultClient(connectionName: "marionkv");
+
 if (integrationTesting)
 {
     var connectionString = builder.Configuration.GetConnectionString("mariondb")
