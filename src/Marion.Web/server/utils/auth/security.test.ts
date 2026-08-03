@@ -41,17 +41,33 @@ describe('OIDC transaction security', () => {
       state: random.state(),
       nonce: random.nonce(),
       codeVerifier: random.pkceVerifier()
-    }, random.uuid(), '/pricing?source=google', now)
+    }, random.uuid(), 'https://localhost:7257/auth/google/callback', '/pricing?source=google', now)
 
     expect(transaction).toMatchObject({
       state: 'state',
       nonce: 'nonce',
       codeVerifier: 'verifier',
+      redirectUri: 'https://localhost:7257/auth/google/callback',
       returnTo: '/pricing?source=google',
       issuedAt: now
     })
     expect(isCurrentOAuthTransaction(transaction, now + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000)).toBe(true)
     expect(isCurrentOAuthTransaction(transaction, now + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000 + 1)).toBe(false)
+  })
+
+  it.each([
+    'http://localhost:7257/auth/google/callback',
+    'https://localhost:7257/auth/not-google',
+    'https://localhost:7257/auth/google/callback?returnTo=/',
+    'https://localhost:7257/auth/google/callback#fragment'
+  ])('rejects a transaction with an invalid redirect URI: %s', (redirectUri) => {
+    const transaction = createOAuthTransaction({
+      state: 'state',
+      nonce: 'nonce',
+      codeVerifier: 'verifier'
+    }, 'transaction-id', redirectUri, '/', 1_750_000_000_000)
+
+    expect(isCurrentOAuthTransaction(transaction, 1_750_000_000_000)).toBe(false)
   })
 
   it.each([

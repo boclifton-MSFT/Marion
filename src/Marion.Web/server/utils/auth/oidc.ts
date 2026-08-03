@@ -41,7 +41,7 @@ export async function authorizationUrl(
 ): Promise<URL> {
   const codeChallenge = await oidc.calculatePKCECodeChallenge(transaction.codeVerifier)
   return oidc.buildAuthorizationUrl(configuration, {
-    redirect_uri: settings.redirectUri,
+    redirect_uri: transaction.redirectUri,
     scope: 'openid email profile',
     state: transaction.state,
     nonce: transaction.nonce,
@@ -57,7 +57,7 @@ export async function completeAuthorization(
   search: string,
   now: number
 ): Promise<ExternalIdentity | undefined> {
-  const callbackUrl = new URL(settings.redirectUri)
+  const callbackUrl = new URL(transaction.redirectUri)
   callbackUrl.search = search
 
   const tokens = await oidc.authorizationCodeGrant(configuration, callbackUrl, {
