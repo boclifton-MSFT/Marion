@@ -76,6 +76,12 @@ Development and IntegrationTesting expose `POST /api/system/storage/verify` for 
 
 For future Azure hosting, keep the `documents` logical connection name and provide a Blob service URI plus the physical container name through Aspire. The Aspire client integration uses the environment's default Azure credential for service-URI connections, preserving a managed-identity path without adding account keys to source. Explicit Azure RBAC and production provisioning belong to the deployment layer.
 
+### Dual-mode platform configuration
+
+The API binds `Marion:Platform` to a typed local/Azure contract. Local mode is the default for direct development and accepts Aspire-provided Blob and Service Bus endpoints plus the `mariondb` connection name. Aspire AppHost execution also sets `Marion__Platform__Mode=Local` explicitly.
+
+Azure mode requires an HTTPS Blob service URI, Blob container name, Service Bus fully qualified namespace, SQL server and database names, and an Entra tenant ID. An optional managed identity client ID selects a user-assigned identity; leaving it unset preserves the system-assigned identity path. Azure mode registers one shared `DefaultAzureCredential`, while local mode registers no Azure credential. Validation runs at startup and reports only setting names and mode requirements, never configured values.
+
 ### Future Azure SQL configuration
 
 Keep the `mariondb` logical connection name when replacing the local SQL resource with Azure SQL. Provision Microsoft Entra administration and least-privilege database access outside the application, then supply token-authenticated Azure SQL configuration through Aspire and managed identity rather than source-controlled credentials. The API's `MarionDbContext` registration remains the persistence seam; environment-specific hosting and identity configuration belong in the AppHost and deployment layer.

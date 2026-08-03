@@ -65,6 +65,7 @@ var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
+    .WithEnvironment("Marion__Platform__Mode", "Local")
     .WithReference(keyVault)
     .WithReference(marionDb)
     .WaitFor(marionDb)

@@ -1,4 +1,5 @@
 using Marion.ApiService.Features.System;
+using Marion.ApiService.Infrastructure.Configuration;
 using Marion.ApiService.Infrastructure.Messaging;
 using Marion.ApiService.Infrastructure.Persistence;
 using Marion.ApiService.Infrastructure.Storage;
@@ -9,7 +10,13 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 var builder = WebApplication.CreateBuilder(args);
 var integrationTesting = builder.Environment.IsEnvironment("IntegrationTesting");
 
-builder.AddAzureKeyVaultClient(connectionName: "marionkv");
+builder.AddPlatformConfiguration();
+builder.AddAzureKeyVaultClient(
+    connectionName: "marionkv",
+    settings =>
+    {
+        settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
+    });
 
 if (integrationTesting)
 {
