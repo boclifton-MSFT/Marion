@@ -9,7 +9,7 @@
   },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
-  "postCreateCommand": "bash -c 'set -euo pipefail; corepack enable; dotnet tool install --global Aspire.Cli --version 13.4.6; dotnet restore src/Marion.slnx; (cd src/Marion.Web && corepack pnpm install --frozen-lockfile)'",
+  "postCreateCommand": "bash -c 'set -euo pipefail; corepack enable; if dotnet tool list --global | grep -qi \"^aspire\\.cli[[:space:]]\"; then dotnet tool update --global Aspire.Cli --version 13.4.6 --allow-downgrade; else dotnet tool install --global Aspire.Cli --version 13.4.6; fi; dotnet restore src/Marion.slnx; (cd src/Marion.Web && corepack pnpm install --frozen-lockfile)'",
   "forwardPorts": [17171, 7257, 7392, 5435],
   "portsAttributes": {
     "17171": {
