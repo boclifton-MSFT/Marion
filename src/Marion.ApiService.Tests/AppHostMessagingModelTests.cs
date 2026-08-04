@@ -36,6 +36,12 @@ public sealed class AppHostMessagingModelTests
         Assert.Same(messaging, loanEvents.Parent);
         Assert.Equal("loan-events-subscription", loanEventsSubscription.SubscriptionName);
         Assert.Same(loanEvents, loanEventsSubscription.Parent);
+        var defaultServiceBusRoles = Assert.Single(
+            messaging.Annotations.OfType<DefaultRoleAssignmentsAnnotation>());
+        Assert.Equal(
+            ServiceBusBuiltInRole.GetBuiltInRoleName(
+                ServiceBusBuiltInRole.AzureServiceBusDataOwner),
+            Assert.Single(defaultServiceBusRoles.Roles).Name);
         var serviceBusRoles = Assert.Single(
             apiService.Annotations.OfType<RoleAssignmentAnnotation>(),
             annotation => annotation.Target == messaging);
@@ -43,6 +49,10 @@ public sealed class AppHostMessagingModelTests
             ServiceBusBuiltInRole.GetBuiltInRoleName(
                 ServiceBusBuiltInRole.AzureServiceBusDataSender),
             Assert.Single(serviceBusRoles.Roles).Name);
+        Assert.DoesNotContain(
+            serviceBusRoles.Roles,
+            role => role.Name == ServiceBusBuiltInRole.GetBuiltInRoleName(
+                ServiceBusBuiltInRole.AzureServiceBusDataOwner));
         Assert.Contains(
             apiService.Annotations.OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == messaging
