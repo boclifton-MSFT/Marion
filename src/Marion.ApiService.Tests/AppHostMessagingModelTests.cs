@@ -3,6 +3,7 @@ extern alias AppHost;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
+using Azure.Provisioning.ServiceBus;
 using Xunit;
 using AppHostProjects = AppHost::Projects;
 
@@ -35,6 +36,13 @@ public sealed class AppHostMessagingModelTests
         Assert.Same(messaging, loanEvents.Parent);
         Assert.Equal("loan-events-subscription", loanEventsSubscription.SubscriptionName);
         Assert.Same(loanEvents, loanEventsSubscription.Parent);
+        var serviceBusRoles = Assert.Single(
+            apiService.Annotations.OfType<RoleAssignmentAnnotation>(),
+            annotation => annotation.Target == messaging);
+        Assert.Equal(
+            ServiceBusBuiltInRole.GetBuiltInRoleName(
+                ServiceBusBuiltInRole.AzureServiceBusDataSender),
+            Assert.Single(serviceBusRoles.Roles).Name);
         Assert.Contains(
             apiService.Annotations.OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == messaging

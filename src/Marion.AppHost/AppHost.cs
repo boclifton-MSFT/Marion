@@ -1,5 +1,6 @@
 #pragma warning disable ASPIRECERTIFICATES001
 
+using Azure.Provisioning.ServiceBus;
 using System.Text.Json.Nodes;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -71,6 +72,7 @@ var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
+    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithEnvironment("Marion__Platform__Mode", "Local")
     .WithReference(marionDb)
     .WaitFor(marionDb)
