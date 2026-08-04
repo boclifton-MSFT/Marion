@@ -21,7 +21,6 @@ if (keyVault is not null)
     keyVault.AddSecret("google-client-secret", googleClientSecret);
 }
 
-var sql = builder.AddSqlServer("sql");
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(emulator =>
     {
@@ -55,13 +54,6 @@ var messaging = builder.AddAzureServiceBus("messaging")
         });
     });
 
-if (!integrationTesting)
-{
-    sql.WithDataVolume()
-        .WithLifetime(ContainerLifetime.Persistent);
-}
-
-var marionDb = sql.AddDatabase("mariondb");
 var documents = storage.AddBlobContainer("documents", "test-files");
 var documentProcessing = messaging.AddServiceBusQueue(
     "document-processing",
@@ -107,8 +99,6 @@ var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
         context.EnvironmentVariables["Marion__Platform__Azure__SqlDatabase"] =
             azureSqlDatabase.Resource;
     })
-    .WithReference(marionDb)
-    .WaitFor(marionDb)
     .WithReference(documents)
     .WaitFor(documents)
     .WithReference(messaging)
@@ -124,19 +114,35 @@ if (integrationTesting)
 {
     apiService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "IntegrationTesting");
 }
-else
-{
-    builder.AddViteApp("frontend", "../Marion.Web")
+var frontend = integrationTesting
+    ? null
+    : builder.AddViteApp("frontend", "../Marion.Web")
         .WithPnpm()
         .WithHttpsEndpoint(port: 7257, env: "PORT")
         .WithHttpsDeveloperCertificate()
         .WithExternalHttpEndpoints()
-        .WithReference(marionDb)
-        .WaitFor(marionDb)
         .WithReference(apiService)
         .WaitFor(apiService)
         .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"))
         .WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true");
+
+if (builder.ExecutionContext.IsRunMode)
+{
+    var sql = builder.AddSqlServer("sql");
+    if (!integrationTesting)
+    {
+        sql.WithDataVolume()
+            .WithLifetime(ContainerLifetime.Persistent);
+    }
+    var marionDb = sql.AddDatabase("mariondb");
+
+    apiService.WithReference(marionDb)
+        .WaitFor(marionDb);
+    if (frontend is not null)
+    {
+        frontend.WithReference(marionDb)
+            .WaitFor(marionDb);
+    }
 }
 
 builder.Build().Run();

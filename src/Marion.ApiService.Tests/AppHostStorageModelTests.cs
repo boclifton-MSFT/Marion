@@ -13,11 +13,12 @@ namespace Marion.ApiService.Tests;
 public sealed class AppHostStorageModelTests
 {
     [Fact]
-    public async Task Run_model_selects_Local_platform_mode_without_Azure_deployment_parameters()
+    public async Task Run_model_retains_local_SQL_and_selects_Local_platform_mode()
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
+        Assert.Equal(DistributedApplicationOperation.Run, builder.ExecutionContext.Operation);
         var resources = builder.Resources.ToArray();
         var annotations = resources.ToDictionary(
             resource => resource,
@@ -31,12 +32,20 @@ public sealed class AppHostStorageModelTests
             Assert.Single(resources, resource => resource.Name == "storage"));
         var documents = Assert.IsType<AzureBlobStorageContainerResource>(
             Assert.Single(resources, resource => resource.Name == "documents"));
+        var sql = Assert.IsType<SqlServerServerResource>(
+            Assert.Single(resources, resource => resource.Name == "sql"));
+        var marionDb = Assert.IsType<SqlServerDatabaseResource>(
+            Assert.Single(resources, resource => resource.Name == "mariondb"));
         var apiService = Assert.Single(
             resources,
             resource => resource.Name == "apiservice");
+        var frontend = Assert.Single(
+            resources,
+            resource => resource.Name == "frontend");
 
         Assert.True(storage.IsEmulator);
         Assert.Equal("test-files", documents.BlobContainerName);
+        Assert.Same(sql, marionDb.Parent);
         Assert.Contains(
             annotations[storage].OfType<ContainerMountAnnotation>(),
             annotation => annotation.Type == ContainerMountType.Volume);
@@ -50,12 +59,40 @@ public sealed class AppHostStorageModelTests
         Assert.Contains(
             annotations[apiService].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == documents);
+        Assert.Contains(
+            annotations[apiService].OfType<ResourceRelationshipAnnotation>(),
+            annotation => annotation.Resource == marionDb
+                && annotation.Type == "Reference");
+        Assert.Contains(
+            annotations[apiService].OfType<WaitAnnotation>(),
+            annotation => annotation.Resource == marionDb);
+        Assert.Contains(
+            annotations[frontend].OfType<ResourceRelationshipAnnotation>(),
+            annotation => annotation.Resource == marionDb
+                && annotation.Type == "Reference");
+        Assert.Contains(
+            annotations[frontend].OfType<WaitAnnotation>(),
+            annotation => annotation.Resource == marionDb);
 
         var runEnvironment = await ResolveEnvironmentAsync(
             apiService,
             annotations[apiService],
             DistributedApplicationOperation.Run);
         Assert.Equal("Local", runEnvironment["Marion__Platform__Mode"]);
+        var allApiEnvironment = await ResolveAllEnvironmentAsync(
+            apiService,
+            annotations[apiService],
+            DistributedApplicationOperation.Run);
+        var frontendEnvironment = await ResolveAllEnvironmentAsync(
+            frontend,
+            annotations[frontend],
+            DistributedApplicationOperation.Run);
+        Assert.Equal(
+            "{mariondb.connectionString}",
+            GetManifestExpression(allApiEnvironment, "ConnectionStrings__mariondb"));
+        Assert.Equal(
+            "{mariondb.connectionString}",
+            GetManifestExpression(frontendEnvironment, "ConnectionStrings__mariondb"));
         Assert.DoesNotContain(
             resources,
             resource => resource.Name is "azure-sql-server" or "azure-sql-database");
@@ -68,6 +105,7 @@ public sealed class AppHostStorageModelTests
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
                 ["--publisher", "manifest"]);
 
+        Assert.Equal(DistributedApplicationOperation.Publish, builder.ExecutionContext.Operation);
         var resources = builder.Resources.ToArray();
         var annotations = resources.ToDictionary(
             resource => resource,
@@ -90,11 +128,29 @@ public sealed class AppHostStorageModelTests
         var apiService = Assert.Single(
             resources,
             resource => resource.Name == "apiservice");
+        var frontend = Assert.Single(
+            resources,
+            resource => resource.Name == "frontend");
 
         Assert.False(storage.IsEmulator);
         Assert.False(messaging.IsEmulator);
         Assert.False(azureSqlServer.Secret);
         Assert.False(azureSqlDatabase.Secret);
+        Assert.DoesNotContain(
+            resources,
+            resource => resource.Name is "sql" or "mariondb");
+        Assert.DoesNotContain(
+            annotations[apiService].OfType<ResourceRelationshipAnnotation>(),
+            annotation => annotation.Resource.Name == "mariondb");
+        Assert.DoesNotContain(
+            annotations[apiService].OfType<WaitAnnotation>(),
+            annotation => annotation.Resource.Name == "mariondb");
+        Assert.DoesNotContain(
+            annotations[frontend].OfType<ResourceRelationshipAnnotation>(),
+            annotation => annotation.Resource.Name == "mariondb");
+        Assert.DoesNotContain(
+            annotations[frontend].OfType<WaitAnnotation>(),
+            annotation => annotation.Resource.Name == "mariondb");
 
         var environment = await ResolveEnvironmentAsync(
             apiService,
@@ -126,6 +182,17 @@ public sealed class AppHostStorageModelTests
             GetManifestExpression(
                 environment,
                 "Marion__Platform__Azure__SqlDatabase"));
+
+        var allApiEnvironment = await ResolveAllEnvironmentAsync(
+            apiService,
+            annotations[apiService],
+            DistributedApplicationOperation.Publish);
+        var frontendEnvironment = await ResolveAllEnvironmentAsync(
+            frontend,
+            annotations[frontend],
+            DistributedApplicationOperation.Publish);
+        Assert.DoesNotContain("ConnectionStrings__mariondb", allApiEnvironment);
+        Assert.DoesNotContain("ConnectionStrings__mariondb", frontendEnvironment);
     }
 
     [Fact]
@@ -198,6 +265,25 @@ public sealed class AppHostStorageModelTests
 
         throw new InvalidOperationException(
             "The API platform mode environment callback is missing.");
+    }
+
+    private static async Task<Dictionary<string, object>> ResolveAllEnvironmentAsync(
+        IResource resource,
+        IEnumerable<IResourceAnnotation> annotations,
+        DistributedApplicationOperation operation)
+    {
+        var environment = new Dictionary<string, object>();
+
+        foreach (var annotation in annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            var context = new EnvironmentCallbackContext(
+                new DistributedApplicationExecutionContext(operation),
+                resource,
+                environment);
+            await annotation.Callback(context);
+        }
+
+        return environment;
     }
 
     private static string GetManifestExpression(
