@@ -7,6 +7,7 @@ using Azure;
 using Azure.Core;
 using Azure.Core.Pipeline;
 using Azure.Identity;
+using Azure.Messaging.ServiceBus;
 using Azure.Security.KeyVault.Secrets;
 using Aspire.Hosting.Testing;
 using Marion.ApiService.Features.System;
@@ -99,9 +100,6 @@ public sealed class PlatformConfigurationTests
                 "Marion:Platform:Azure:SqlDatabase",
                 "marion");
             builder.UseSetting(
-                "Marion:Platform:Azure:Identity:TenantId",
-                "tenant-id");
-            builder.UseSetting(
                 "Marion:Platform:Azure:Identity:ManagedIdentityClientId",
                 "user-assigned-client-id");
             builder.UseSetting("AZURE_CLIENT_ID", "environment-client-id");
@@ -133,6 +131,7 @@ public sealed class PlatformConfigurationTests
         Assert.Equal(
             "user-assigned-client-id",
             options.Azure.Identity.ManagedIdentityClientId);
+        Assert.Null(options.Azure.Identity.TenantId);
     }
 
     [Fact]
@@ -173,9 +172,68 @@ public sealed class PlatformConfigurationTests
         });
 
         Assert.Contains("BlobServiceUri", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("TenantId", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("TenantId", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Local settings are not allowed", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("mariondb", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Azure_mode_rejects_secret_bearing_and_non_host_Service_Bus_namespaces()
+    {
+        var invalidNamespaces = new[]
+        {
+            "Endpoint=sb://messaging.servicebus.windows.net/;SharedAccessKeyName=sender;SharedAccessKey=redacted",
+            "SharedAccessSignature",
+            "sb://messaging.servicebus.windows.net",
+            "https://messaging.servicebus.windows.net",
+            "identity@messaging.servicebus.windows.net",
+            "messaging.servicebus.windows.net/entity",
+            "messaging.servicebus.windows.net?sig=redacted",
+            "messaging.servicebus.windows.net#fragment",
+            "not a host"
+        };
+
+        foreach (var invalidNamespace in invalidNamespaces)
+        {
+            var settings = CreateAzureSettings(
+                "https://documents.blob.core.windows.net");
+            settings[$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+                invalidNamespace;
+
+            var exception = ResolveOptions(settings);
+
+            Assert.Contains(
+                "Marion:Platform:Azure:ServiceBusFullyQualifiedNamespace",
+                exception.Message,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                invalidNamespace,
+                exception.ToString(),
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("messaging.servicebus.windows.net")]
+    [InlineData("messaging.servicebus.usgovcloudapi.net")]
+    [InlineData("broker.private.contoso.internal")]
+    public async Task Azure_mode_accepts_Service_Bus_hosts_supported_by_the_SDK(
+        string fullyQualifiedNamespace)
+    {
+        var settings = CreateAzureSettings(
+            "https://documents.blob.core.windows.net");
+        settings[$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+            fullyQualifiedNamespace;
+
+        var options = ResolvePlatformOptions(settings);
+        await using var client = new ServiceBusClient(
+            fullyQualifiedNamespace,
+            new ProbeTokenCredential());
+
+        Assert.Equal(
+            fullyQualifiedNamespace,
+            options.Azure.ServiceBusFullyQualifiedNamespace);
+        Assert.Equal(fullyQualifiedNamespace, client.FullyQualifiedNamespace);
     }
 
     [Fact]
@@ -284,6 +342,16 @@ public sealed class PlatformConfigurationTests
             host.Services.GetRequiredService<IOptions<PlatformOptions>>().Value);
     }
 
+    private static PlatformOptions ResolvePlatformOptions(
+        IReadOnlyDictionary<string, string?> settings)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(settings);
+        builder.AddPlatformConfiguration();
+        using var host = builder.Build();
+        return host.Services.GetRequiredService<IOptions<PlatformOptions>>().Value;
+    }
+
     private static Dictionary<string, string?> CreateAzureSettings(
         string blobServiceUri) =>
         new()
@@ -295,8 +363,7 @@ public sealed class PlatformConfigurationTests
                 "messaging.servicebus.windows.net",
             [$"{PlatformOptions.SectionName}:Azure:SqlServer"] =
                 "marion.database.windows.net",
-            [$"{PlatformOptions.SectionName}:Azure:SqlDatabase"] = "marion",
-            [$"{PlatformOptions.SectionName}:Azure:Identity:TenantId"] = "tenant-id"
+            [$"{PlatformOptions.SectionName}:Azure:SqlDatabase"] = "marion"
         };
 
     private sealed class ProbeTokenCredential : TokenCredential

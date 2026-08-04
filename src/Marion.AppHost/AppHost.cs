@@ -70,11 +70,43 @@ var loanEvents = messaging.AddServiceBusTopic("loan-events", "loan-events");
 var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription",
     "loan-events-subscription");
+var azureSqlServer = builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("azure-sql-server")
+    : null;
+var azureSqlDatabase = builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("azure-sql-database")
+    : null;
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
     .WithEnvironment(context =>
-        context.EnvironmentVariables["Marion__Platform__Mode"] =
-            context.ExecutionContext.IsPublishMode ? "Azure" : "Local")
+    {
+        if (context.ExecutionContext.IsRunMode)
+        {
+            context.EnvironmentVariables["Marion__Platform__Mode"] = "Local";
+            return;
+        }
+
+        if (!context.ExecutionContext.IsPublishMode
+            || azureSqlServer is null
+            || azureSqlDatabase is null)
+        {
+            throw new InvalidOperationException(
+                "The API publish environment requires the Azure deployment parameters.");
+        }
+
+        context.EnvironmentVariables["Marion__Platform__Mode"] = "Azure";
+        context.EnvironmentVariables["Marion__Platform__Azure__BlobServiceUri"] =
+            storage.Resource.BlobUriExpression;
+        context.EnvironmentVariables["Marion__Platform__Azure__BlobContainerName"] =
+            documents.Resource.BlobContainerName;
+        context.EnvironmentVariables[
+                "Marion__Platform__Azure__ServiceBusFullyQualifiedNamespace"] =
+            messaging.Resource.HostName;
+        context.EnvironmentVariables["Marion__Platform__Azure__SqlServer"] =
+            azureSqlServer.Resource;
+        context.EnvironmentVariables["Marion__Platform__Azure__SqlDatabase"] =
+            azureSqlDatabase.Resource;
+    })
     .WithReference(marionDb)
     .WaitFor(marionDb)
     .WithReference(documents)

@@ -205,6 +205,15 @@ internal static class PlatformConfigurationExtensions
 
 internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOptions>
 {
+    private static readonly string[] ServiceBusConnectionStringKeys =
+    [
+        "Endpoint",
+        "EntityPath",
+        "SharedAccessKey",
+        "SharedAccessKeyName",
+        "SharedAccessSignature"
+    ];
+
     public ValidateOptionsResult Validate(
         string? name,
         PlatformOptions options)
@@ -265,7 +274,7 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
             failures,
             "Marion:Platform:Azure:BlobContainerName",
             azure.BlobContainerName);
-        RequireValue(
+        RequireServiceBusFullyQualifiedNamespace(
             failures,
             "Marion:Platform:Azure:ServiceBusFullyQualifiedNamespace",
             azure.ServiceBusFullyQualifiedNamespace);
@@ -277,11 +286,6 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
             failures,
             "Marion:Platform:Azure:SqlDatabase",
             azure.SqlDatabase);
-        RequireValue(
-            failures,
-            "Marion:Platform:Azure:Identity:TenantId",
-            azure.Identity.TenantId);
-
         if (HasLocalSettings(options.Local))
         {
             failures.Add(
@@ -343,6 +347,25 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
         {
             failures.Add(
                 $"{settingName} must be a credential-free HTTPS Blob service root URI in Azure mode.");
+        }
+    }
+
+    private static void RequireServiceBusFullyQualifiedNamespace(
+        ICollection<string> failures,
+        string settingName,
+        string? value)
+    {
+        var fullyQualifiedNamespace = value?.Trim();
+        if (string.IsNullOrEmpty(fullyQualifiedNamespace)
+            || fullyQualifiedNamespace.Any(char.IsWhiteSpace)
+            || fullyQualifiedNamespace.IndexOfAny([';', '=', '/', '\\', '@', '?', '#']) >= 0
+            || ServiceBusConnectionStringKeys.Contains(
+                fullyQualifiedNamespace,
+                StringComparer.OrdinalIgnoreCase)
+            || Uri.CheckHostName(fullyQualifiedNamespace) == UriHostNameType.Unknown)
+        {
+            failures.Add(
+                $"{settingName} must be a credential-free Service Bus fully qualified namespace host in Azure mode.");
         }
     }
 

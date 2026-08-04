@@ -13,7 +13,7 @@ namespace Marion.ApiService.Tests;
 public sealed class AppHostStorageModelTests
 {
     [Fact]
-    public async Task Run_and_publish_models_select_the_matching_platform_mode()
+    public async Task Run_model_selects_Local_platform_mode_without_Azure_deployment_parameters()
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
@@ -55,13 +55,77 @@ public sealed class AppHostStorageModelTests
             apiService,
             annotations[apiService],
             DistributedApplicationOperation.Run);
-        var publishEnvironment = await ResolveEnvironmentAsync(
+        Assert.Equal("Local", runEnvironment["Marion__Platform__Mode"]);
+        Assert.DoesNotContain(
+            resources,
+            resource => resource.Name is "azure-sql-server" or "azure-sql-database");
+    }
+
+    [Fact]
+    public async Task Publish_model_supplies_the_complete_Azure_platform_environment_contract()
+    {
+        await using var builder =
+            await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
+                ["--publisher", "manifest"]);
+
+        var resources = builder.Resources.ToArray();
+        var annotations = resources.ToDictionary(
+            resource => resource,
+            resource => resource.Annotations.ToArray());
+
+        {
+            await using var app = await builder.BuildAsync();
+        }
+
+        var storage = Assert.IsType<AzureStorageResource>(
+            Assert.Single(resources, resource => resource.Name == "storage"));
+        var documents = Assert.IsType<AzureBlobStorageContainerResource>(
+            Assert.Single(resources, resource => resource.Name == "documents"));
+        var messaging = Assert.IsType<AzureServiceBusResource>(
+            Assert.Single(resources, resource => resource.Name == "messaging"));
+        var azureSqlServer = Assert.IsType<ParameterResource>(
+            Assert.Single(resources, resource => resource.Name == "azure-sql-server"));
+        var azureSqlDatabase = Assert.IsType<ParameterResource>(
+            Assert.Single(resources, resource => resource.Name == "azure-sql-database"));
+        var apiService = Assert.Single(
+            resources,
+            resource => resource.Name == "apiservice");
+
+        Assert.False(storage.IsEmulator);
+        Assert.False(messaging.IsEmulator);
+        Assert.False(azureSqlServer.Secret);
+        Assert.False(azureSqlDatabase.Secret);
+
+        var environment = await ResolveEnvironmentAsync(
             apiService,
             annotations[apiService],
             DistributedApplicationOperation.Publish);
 
-        Assert.Equal("Local", runEnvironment["Marion__Platform__Mode"]);
-        Assert.Equal("Azure", publishEnvironment["Marion__Platform__Mode"]);
+        Assert.Equal(6, environment.Count);
+        Assert.Equal("Azure", environment["Marion__Platform__Mode"]);
+        Assert.Equal(
+            storage.BlobUriExpression.ValueExpression,
+            GetManifestExpression(
+                environment,
+                "Marion__Platform__Azure__BlobServiceUri"));
+        Assert.Equal(
+            documents.BlobContainerName,
+            environment["Marion__Platform__Azure__BlobContainerName"]);
+        Assert.Equal(
+            messaging.HostName.ValueExpression,
+            GetManifestExpression(
+                environment,
+                "Marion__Platform__Azure__ServiceBusFullyQualifiedNamespace"));
+        Assert.Equal(
+            azureSqlServer.ValueExpression,
+            GetManifestExpression(
+                environment,
+                "Marion__Platform__Azure__SqlServer"));
+        Assert.Equal(
+            azureSqlDatabase.ValueExpression,
+            GetManifestExpression(
+                environment,
+                "Marion__Platform__Azure__SqlDatabase"));
     }
 
     [Fact]
@@ -135,4 +199,10 @@ public sealed class AppHostStorageModelTests
         throw new InvalidOperationException(
             "The API platform mode environment callback is missing.");
     }
+
+    private static string GetManifestExpression(
+        IReadOnlyDictionary<string, object> environment,
+        string name) =>
+        Assert.IsAssignableFrom<IManifestExpressionProvider>(environment[name])
+            .ValueExpression;
 }
