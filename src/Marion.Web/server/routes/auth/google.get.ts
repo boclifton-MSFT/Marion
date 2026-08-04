@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
       state: dependencies.random.state(),
       nonce: dependencies.random.nonce(),
       codeVerifier: dependencies.random.pkceVerifier()
-    }, dependencies.random.uuid(), returnTo, dependencies.clock.now())
+    }, dependencies.random.uuid(), settings.redirectUri, returnTo, dependencies.clock.now())
 
     if (!await saveTransactionInCookie(event, transaction)) {
       return sendRedirect(event, SIGN_IN_UNAVAILABLE)
