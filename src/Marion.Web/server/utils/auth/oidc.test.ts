@@ -83,6 +83,20 @@ function configuration(
   return config
 }
 
+const invalidClaimCases: Array<[
+  string,
+  (nowSeconds: number) => Record<string, unknown>
+]> = [
+  ['issuer', () => ({ iss: 'https://attacker.example.test' })],
+  ['audience', () => ({ aud: 'another-client' })],
+  ['nonce', () => ({ nonce: 'another-nonce' })],
+  ['expiry', () => ({ exp: 1 })],
+  ['old issued-at', nowSeconds => ({ iat: nowSeconds - 10 * 60 - 1 })],
+  ['future issued-at', nowSeconds => ({ iat: nowSeconds + 61 })],
+  ['missing subject', () => ({ sub: undefined })],
+  ['empty subject', () => ({ sub: '' })]
+]
+
 describe('OIDC ID-token verification', () => {
   it('builds an authorization request with every required OIDC parameter', async () => {
     const config = configuration(Math.floor(Date.now() / 1000))
@@ -131,25 +145,22 @@ describe('OIDC ID-token verification', () => {
     )).rejects.toThrow()
   })
 
-  it.each([
-    ['issuer', { iss: 'https://attacker.example.test' }],
-    ['audience', { aud: 'another-client' }],
-    ['nonce', { nonce: 'another-nonce' }],
-    ['expiry', { exp: 1 }],
-    ['missing subject', { sub: undefined }],
-    ['empty subject', { sub: '' }]
-  ])('fails closed for an invalid %s in a signed provider token', async (_, claimOverrides) => {
-    const now = Date.now()
-    const config = configuration(Math.floor(now / 1000), claimOverrides)
+  it.each(invalidClaimCases)(
+    'fails closed for an invalid %s in a signed provider token',
+    async (_, claims) => {
+      const now = Date.now()
+      const nowSeconds = Math.floor(now / 1000)
+      const config = configuration(nowSeconds, claims(nowSeconds))
 
-    const identity = await completeAuthorization(
-      config,
-      settings,
-      transaction,
-      '?code=authorization-code&state=state-value',
-      now
-    ).catch(() => undefined)
+      const identity = await completeAuthorization(
+        config,
+        settings,
+        transaction,
+        '?code=authorization-code&state=state-value',
+        now
+      ).catch(() => undefined)
 
-    expect(identity).toBeUndefined()
-  })
+      expect(identity).toBeUndefined()
+    }
+  )
 })
