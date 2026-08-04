@@ -17,18 +17,25 @@ public sealed class AppHostMessagingModelTests
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
+        var resources = builder.Resources.ToArray();
+        var annotations = resources.ToDictionary(
+            resource => resource,
+            resource => resource.Annotations.ToArray());
+
+        await using var app = await builder.BuildAsync();
+
         var messaging = Assert.IsType<AzureServiceBusResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "messaging"));
+            Assert.Single(resources, resource => resource.Name == "messaging"));
         var documentProcessing = Assert.IsType<AzureServiceBusQueueResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "document-processing"));
+            Assert.Single(resources, resource => resource.Name == "document-processing"));
         var loanEvents = Assert.IsType<AzureServiceBusTopicResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "loan-events"));
+            Assert.Single(resources, resource => resource.Name == "loan-events"));
         var loanEventsSubscription = Assert.IsType<AzureServiceBusSubscriptionResource>(
             Assert.Single(
-                builder.Resources,
+                resources,
                 resource => resource.Name == "loan-events-subscription"));
         var apiService = Assert.Single(
-            builder.Resources,
+            resources,
             resource => resource.Name == "apiservice");
 
         Assert.True(messaging.IsEmulator);
@@ -37,19 +44,17 @@ public sealed class AppHostMessagingModelTests
         Assert.Equal("loan-events-subscription", loanEventsSubscription.SubscriptionName);
         Assert.Same(loanEvents, loanEventsSubscription.Parent);
         Assert.DoesNotContain(
-            messaging.Annotations,
+            annotations[messaging],
             annotation => annotation is DefaultRoleAssignmentsAnnotation);
         Assert.DoesNotContain(
-            apiService.Annotations,
+            annotations[apiService],
             annotation => annotation is RoleAssignmentAnnotation);
         Assert.Contains(
-            apiService.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            annotations[apiService].OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == messaging
                 && annotation.Type == "Reference");
         Assert.Contains(
-            apiService.Annotations.OfType<WaitAnnotation>(),
+            annotations[apiService].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == messaging);
-
-        await using var app = await builder.BuildAsync();
     }
 }

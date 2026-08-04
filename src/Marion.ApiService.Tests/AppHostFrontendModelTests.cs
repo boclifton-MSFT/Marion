@@ -18,12 +18,20 @@ public sealed class AppHostFrontendModelTests
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
-        var frontend = Assert.Single(builder.Resources, resource => resource.Name == "frontend");
-        var database = Assert.Single(builder.Resources, resource => resource.Name == "mariondb");
+        var resources = builder.Resources.ToArray();
+        var annotations = resources.ToDictionary(
+            resource => resource,
+            resource => resource.Annotations.ToArray());
+
+        await using var app = await builder.BuildAsync();
+
+        var frontend = Assert.Single(resources, resource => resource.Name == "frontend");
+        var database = Assert.Single(resources, resource => resource.Name == "mariondb");
         var endpoint = Assert.Single(
-            frontend.Annotations.OfType<EndpointAnnotation>(),
+            annotations[frontend].OfType<EndpointAnnotation>(),
             annotation => annotation.Name == "https");
-        var certificate = Assert.Single(frontend.Annotations.OfType<HttpsCertificateAnnotation>());
+        var certificate = Assert.Single(
+            annotations[frontend].OfType<HttpsCertificateAnnotation>());
 
         Assert.Equal(7257, endpoint.Port);
         Assert.Equal("https", endpoint.UriScheme);
@@ -31,13 +39,11 @@ public sealed class AppHostFrontendModelTests
         Assert.True(endpoint.IsExternal);
         Assert.True(certificate.UseDeveloperCertificate);
         Assert.Contains(
-            frontend.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            annotations[frontend].OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == database
                 && annotation.Type == "Reference");
         Assert.Contains(
-            frontend.Annotations.OfType<WaitAnnotation>(),
+            annotations[frontend].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == database);
-
-        await using var app = await builder.BuildAsync();
     }
 }
