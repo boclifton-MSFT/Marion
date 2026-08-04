@@ -23,7 +23,9 @@ public sealed class AppHostFrontendModelTests
             resource => resource,
             resource => resource.Annotations.ToArray());
 
-        await using var app = await builder.BuildAsync();
+        {
+            await using var app = await builder.BuildAsync();
+        }
 
         var frontend = Assert.Single(resources, resource => resource.Name == "frontend");
         var database = Assert.Single(resources, resource => resource.Name == "mariondb");

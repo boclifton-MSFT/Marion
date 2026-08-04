@@ -22,7 +22,9 @@ public sealed class AppHostMessagingModelTests
             resource => resource,
             resource => resource.Annotations.ToArray());
 
-        await using var app = await builder.BuildAsync();
+        {
+            await using var app = await builder.BuildAsync();
+        }
 
         var messaging = Assert.IsType<AzureServiceBusResource>(
             Assert.Single(resources, resource => resource.Name == "messaging"));

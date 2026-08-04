@@ -22,7 +22,9 @@ public sealed class AppHostStorageModelTests
             resource => resource,
             resource => resource.Annotations.ToArray());
 
-        await using var app = await builder.BuildAsync();
+        {
+            await using var app = await builder.BuildAsync();
+        }
 
         var storage = Assert.IsType<AzureStorageResource>(
             Assert.Single(resources, resource => resource.Name == "storage"));
@@ -61,7 +63,9 @@ public sealed class AppHostStorageModelTests
             resource => resource,
             resource => resource.Annotations.ToArray());
 
-        await using var app = await builder.BuildAsync();
+        {
+            await using var app = await builder.BuildAsync();
+        }
 
         var storage = Assert.IsType<AzureStorageResource>(
             Assert.Single(resources, resource => resource.Name == "storage"));
