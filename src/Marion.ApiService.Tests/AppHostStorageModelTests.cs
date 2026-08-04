@@ -16,7 +16,6 @@ public sealed class AppHostStorageModelTests
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
-        await using var app = await builder.BuildAsync();
 
         var storage = Assert.IsType<AzureStorageResource>(
             Assert.Single(builder.Resources, resource => resource.Name == "storage"));
@@ -41,6 +40,8 @@ public sealed class AppHostStorageModelTests
         Assert.Contains(
             apiService.Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource == documents);
+
+        await using var app = await builder.BuildAsync();
     }
 
     [Fact]
@@ -49,7 +50,6 @@ public sealed class AppHostStorageModelTests
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
                 ["--IntegrationTesting=true"]);
-        await using var app = await builder.BuildAsync();
 
         var storage = Assert.IsType<AzureStorageResource>(
             Assert.Single(builder.Resources, resource => resource.Name == "storage"));
@@ -79,5 +79,7 @@ public sealed class AppHostStorageModelTests
         Assert.Contains(
             apiService.Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource == documents);
+
+        await using var app = await builder.BuildAsync();
     }
 }

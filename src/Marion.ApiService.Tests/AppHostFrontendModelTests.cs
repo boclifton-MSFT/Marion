@@ -17,7 +17,6 @@ public sealed class AppHostFrontendModelTests
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
-        await using var app = await builder.BuildAsync();
 
         var frontend = Assert.Single(builder.Resources, resource => resource.Name == "frontend");
         var database = Assert.Single(builder.Resources, resource => resource.Name == "mariondb");
@@ -38,5 +37,7 @@ public sealed class AppHostFrontendModelTests
         Assert.Contains(
             frontend.Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource == database);
+
+        await using var app = await builder.BuildAsync();
     }
 }

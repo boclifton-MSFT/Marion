@@ -16,7 +16,6 @@ public sealed class AppHostMessagingModelTests
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
-        await using var app = await builder.BuildAsync();
 
         var messaging = Assert.IsType<AzureServiceBusResource>(
             Assert.Single(builder.Resources, resource => resource.Name == "messaging"));
@@ -50,5 +49,7 @@ public sealed class AppHostMessagingModelTests
         Assert.Contains(
             apiService.Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource == messaging);
+
+        await using var app = await builder.BuildAsync();
     }
 }
