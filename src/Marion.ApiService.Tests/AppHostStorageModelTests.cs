@@ -13,7 +13,7 @@ public sealed class AppHostStorageModelTests
     [Fact]
     public async Task Development_models_persistent_private_document_storage()
     {
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
         var storage = Assert.IsType<AzureStorageResource>(
@@ -44,7 +44,7 @@ public sealed class AppHostStorageModelTests
     [Fact]
     public async Task IntegrationTesting_models_ephemeral_storage_with_dynamic_ports()
     {
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
                 ["--IntegrationTesting=true"]);
 

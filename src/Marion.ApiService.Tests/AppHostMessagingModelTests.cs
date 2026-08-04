@@ -13,7 +13,7 @@ public sealed class AppHostMessagingModelTests
     [Fact]
     public async Task AppHost_models_the_Service_Bus_emulator_and_API_dependency_without_RBAC_assignments()
     {
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
         var messaging = Assert.IsType<AzureServiceBusResource>(

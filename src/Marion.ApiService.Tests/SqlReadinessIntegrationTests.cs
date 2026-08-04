@@ -21,7 +21,7 @@ public sealed class SqlReadinessIntegrationTests
     public async Task Readiness_tracks_SQL_while_liveness_and_safe_dependencies_remain_available()
     {
         using var timeout = new CancellationTokenSource(TestTimeout);
-        var builder = await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
             MarionApiFactory.IntegrationTestingArguments,
             timeout.Token);
 

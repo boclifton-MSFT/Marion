@@ -159,7 +159,7 @@ public sealed class PlatformConfigurationTests
     public async Task AppHost_named_references_start_the_API_with_local_platform_configuration()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        var builder = await DistributedApplicationTestingBuilder.CreateAsync<
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<
             AppHostProjects.Marion_AppHost>(
             MarionApiFactory.IntegrationTestingArguments,
             timeout.Token);

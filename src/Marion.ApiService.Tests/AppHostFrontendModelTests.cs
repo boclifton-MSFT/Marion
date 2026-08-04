@@ -14,7 +14,7 @@ public sealed class AppHostFrontendModelTests
     [Fact]
     public async Task Development_models_the_frontend_at_the_stable_HTTPS_origin()
     {
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
         var frontend = Assert.Single(builder.Resources, resource => resource.Name == "frontend");

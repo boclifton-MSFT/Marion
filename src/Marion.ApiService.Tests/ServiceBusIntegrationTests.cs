@@ -20,7 +20,7 @@ public sealed class ServiceBusIntegrationTests
     public async Task API_publishes_a_versioned_traceable_synthetic_message_through_the_emulator()
     {
         using var timeout = new CancellationTokenSource(TestTimeout);
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
                 MarionApiFactory.IntegrationTestingArguments,
                 timeout.Token);

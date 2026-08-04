@@ -22,7 +22,7 @@ public sealed class BlobStorageIntegrationTests
     public async Task Document_storage_round_trip_outage_and_recovery_are_safe_and_isolated()
     {
         using var timeout = new CancellationTokenSource(TestTimeout);
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>(
                 MarionApiFactory.IntegrationTestingArguments,
                 timeout.Token);
