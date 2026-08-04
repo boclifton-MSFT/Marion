@@ -12,6 +12,7 @@ using AppHostProjects = AppHost::Projects;
 
 namespace Marion.ApiService.Tests;
 
+[Collection(AppHostTestCollection.Name)]
 public sealed class ServiceBusIntegrationTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromMinutes(3);

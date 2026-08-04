@@ -17,6 +17,7 @@ using AppHostProjects = AppHost::Projects;
 
 namespace Marion.ApiService.Tests;
 
+[Collection(AppHostTestCollection.Name)]
 public sealed class PlatformConfigurationTests
 {
     [Fact]

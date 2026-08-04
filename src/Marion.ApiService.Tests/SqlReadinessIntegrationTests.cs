@@ -13,6 +13,7 @@ using AppHostProjects = AppHost::Projects;
 
 namespace Marion.ApiService.Tests;
 
+[Collection(AppHostTestCollection.Name)]
 public sealed class SqlReadinessIntegrationTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromMinutes(2);

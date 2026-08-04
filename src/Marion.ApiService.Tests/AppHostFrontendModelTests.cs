@@ -9,6 +9,7 @@ using AppHostProjects = AppHost::Projects;
 
 namespace Marion.ApiService.Tests;
 
+[Collection(AppHostTestCollection.Name)]
 public sealed class AppHostFrontendModelTests
 {
     [Fact]
@@ -16,6 +17,7 @@ public sealed class AppHostFrontendModelTests
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
+        await using var app = await builder.BuildAsync();
 
         var frontend = Assert.Single(builder.Resources, resource => resource.Name == "frontend");
         var database = Assert.Single(builder.Resources, resource => resource.Name == "mariondb");
