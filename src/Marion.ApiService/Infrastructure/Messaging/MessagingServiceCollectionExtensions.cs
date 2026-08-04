@@ -1,3 +1,4 @@
+using Aspire.Azure.Messaging.ServiceBus;
 using Azure.Core;
 using Azure.Messaging.ServiceBus;
 using Marion.ApiService.Infrastructure.Configuration;
@@ -5,87 +6,64 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Azure;
 
 namespace Marion.ApiService.Infrastructure.Messaging;
 
 internal static class MessagingServiceCollectionExtensions
 {
     internal const string ServiceBusHealthCheckName = "Azure_ServiceBusClient";
-    internal static readonly TimeSpan ConnectivityTimeout = TimeSpan.FromSeconds(5);
+    internal static readonly TimeSpan ConnectivityTimeout = TimeSpan.FromSeconds(4);
+    internal static readonly TimeSpan HealthCheckRegistrationTimeout = TimeSpan.FromSeconds(5);
 
-    private const string LocalServiceBusConnectionName = "messaging";
-
-    internal static IServiceCollection AddPlatformIntegrationPublisher(
-        this IServiceCollection services)
+    internal static IHostApplicationBuilder AddPlatformIntegrationPublisher(
+        this IHostApplicationBuilder builder)
     {
-        services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<ServiceBusClient>(CreateServiceBusClient);
-        services.AddSingleton(serviceProvider =>
-            serviceProvider
-                .GetRequiredService<ServiceBusClient>()
-                .CreateSender(MessagingEntityNames.DocumentProcessingQueue));
-        services.TryAddSingleton<IPlatformIntegrationPublisher,
-            AzureServiceBusPlatformIntegrationPublisher>();
-        services.PostConfigure<HealthCheckServiceOptions>(ConfigureHealthCheck);
+        var platformMode = PlatformConfigurationExtensions.ParseMode(
+            builder.Configuration[PlatformOptions.SectionName + ":Mode"]);
 
-        return services;
-    }
-
-    private static ServiceBusClient CreateServiceBusClient(IServiceProvider serviceProvider)
-    {
-        var platform = serviceProvider
-            .GetRequiredService<IOptions<PlatformOptions>>()
-            .Value;
-
-        return platform.Mode switch
-        {
-            PlatformMode.Local => CreateLocalClient(
-                serviceProvider.GetRequiredService<IConfiguration>()),
-            PlatformMode.Azure => CreateAzureClient(
-                platform.Azure,
-                serviceProvider.GetRequiredService<TokenCredential>()),
-            _ => throw new InvalidOperationException(
-                "A supported Marion platform mode is required before registering Service Bus.")
-        };
-    }
-
-    private static ServiceBusClient CreateLocalClient(IConfiguration configuration)
-    {
-        var connectionString = configuration.GetConnectionString(LocalServiceBusConnectionName);
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException(
-                "The named local Service Bus emulator connection is required.");
-        }
-
-        return new ServiceBusClient(connectionString, CreateClientOptions());
-    }
-
-    private static ServiceBusClient CreateAzureClient(
-        AzurePlatformOptions options,
-        TokenCredential credential)
-    {
-        if (string.IsNullOrWhiteSpace(options.ServiceBusFullyQualifiedNamespace))
-        {
-            throw new InvalidOperationException(
-                "The Azure Service Bus fully qualified namespace is required.");
-        }
-
-        return new ServiceBusClient(
-            options.ServiceBusFullyQualifiedNamespace,
-            credential,
-            CreateClientOptions());
-    }
-
-    private static ServiceBusClientOptions CreateClientOptions() =>
-        new()
-        {
-            RetryOptions =
+        builder.AddAzureServiceBusClient(
+            "messaging",
+            settings =>
             {
-                TryTimeout = ConnectivityTimeout
-            }
-        };
+                if (platformMode == PlatformMode.Azure)
+                {
+                    settings.ConnectionString = null;
+                    settings.FullyQualifiedNamespace = builder.Configuration[
+                        PlatformOptions.SectionName
+                        + ":Azure:ServiceBusFullyQualifiedNamespace"];
+                }
+
+                if (!builder.Environment.IsEnvironment("Testing"))
+                {
+                    settings.HealthCheckQueueName = MessagingEntityNames.DocumentProcessingQueue;
+                }
+            },
+            clientBuilder =>
+            {
+                if (platformMode == PlatformMode.Azure)
+                {
+                    clientBuilder.WithCredential(
+                        serviceProvider => serviceProvider.GetRequiredService<TokenCredential>());
+                }
+            });
+
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.TryAddSingleton<IServiceBusProbeTimer>(serviceProvider =>
+            new ServiceBusProbeTimer(serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.TryAddSingleton<ServiceBusConnectivityHealthCheck>(serviceProvider =>
+            new ServiceBusConnectivityHealthCheck(
+                () => serviceProvider
+                    .GetRequiredService<ServiceBusClient>()
+                    .CreateSender(MessagingEntityNames.DocumentProcessingQueue),
+                ConnectivityTimeout,
+                serviceProvider.GetRequiredService<IServiceBusProbeTimer>()));
+        builder.Services.TryAddSingleton<IPlatformIntegrationPublisher,
+            AzureServiceBusPlatformIntegrationPublisher>();
+        builder.Services.PostConfigure<HealthCheckServiceOptions>(ConfigureHealthCheck);
+
+        return builder;
+    }
 
     private static void ConfigureHealthCheck(HealthCheckServiceOptions options)
     {
@@ -103,10 +81,9 @@ internal static class MessagingServiceCollectionExtensions
         options.Registrations.Add(new HealthCheckRegistration(
             ServiceBusHealthCheckName,
             new Func<IServiceProvider, IHealthCheck>(serviceProvider =>
-                new ServiceBusConnectivityHealthCheck(
-                    serviceProvider.GetRequiredService<ServiceBusSender>())),
+                serviceProvider.GetRequiredService<ServiceBusConnectivityHealthCheck>()),
             HealthStatus.Unhealthy,
             registration.Tags,
-            ConnectivityTimeout));
+            HealthCheckRegistrationTimeout));
     }
 }

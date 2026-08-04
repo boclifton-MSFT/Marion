@@ -61,16 +61,7 @@ builder.AddAzureBlobContainerClient(
     });
 builder.Services.AddDocumentStorage(
     disableHealthChecks: builder.Environment.IsEnvironment("Testing"));
-builder.AddAzureServiceBusClient(
-    "messaging",
-    settings =>
-    {
-        if (!builder.Environment.IsEnvironment("Testing"))
-        {
-            settings.HealthCheckQueueName = MessagingEntityNames.DocumentProcessingQueue;
-        }
-    });
-builder.Services.AddPlatformIntegrationPublisher();
+builder.AddPlatformIntegrationPublisher();
 
 if (integrationTesting)
 {
