@@ -44,6 +44,7 @@ interface TestAuthState {
   rotateSession: ReturnType<typeof vi.fn>
   telemetry: string[]
   sessions: Map<string, MarionSession>
+  now: number
 }
 
 function createTestAuthState(): TestAuthState {
@@ -65,17 +66,19 @@ function createTestAuthState(): TestAuthState {
     sessions.set(session.sessionId, session)
   })
   let generatedId = 0
+  const now = 1_750_000_000_000
 
-  return {
+  const state: TestAuthState = {
     authorizationUrl,
     exchangeCode,
     resolveIdentity,
     rotateSession,
     telemetry,
     sessions,
+    now,
     dependencies: {
       clock: {
-        now: () => 1_750_000_000_000
+        now: () => state.now
       },
       random: {
         uuid: () => `generated-${++generatedId}`,
@@ -124,6 +127,8 @@ function createTestAuthState(): TestAuthState {
       }
     }
   }
+
+  return state
 }
 
 async function startServer(state: TestAuthState) {
@@ -230,6 +235,42 @@ describe('Google auth route boundary', () => {
     expect(output).not.toContain('verifier-sentinel')
     expect(output).not.toContain('nonce-sentinel')
     expect(output).not.toContain(sessionPassword)
+  })
+
+  it('rejects a callback without a transaction cookie', async () => {
+    const state = createTestAuthState()
+    const server = await startServer(state)
+    servers.push(server)
+
+    const callback = await fetch(
+      `${server.baseUrl}/auth/google/callback?state=state-sentinel&code=authorization-code-sentinel`,
+      { redirect: 'manual' }
+    )
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toBe('/login?error=sign-in-failed')
+    expect(state.exchangeCode).not.toHaveBeenCalled()
+  })
+
+  it('rejects an expired transaction without exchanging the authorization code', async () => {
+    const state = createTestAuthState()
+    const server = await startServer(state)
+    servers.push(server)
+    const start = await fetch(`${server.baseUrl}/auth/google`, { redirect: 'manual' })
+    const transactionCookie = requestCookie(cookieNamed(start, '__Host-marion_oauth_tx'))
+    state.now += 5 * 60 * 1000 + 1
+
+    const callback = await fetch(
+      `${server.baseUrl}/auth/google/callback?state=state-sentinel&code=authorization-code-sentinel`,
+      {
+        headers: { cookie: transactionCookie },
+        redirect: 'manual'
+      }
+    )
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toBe('/login?error=sign-in-failed')
+    expect(state.exchangeCode).not.toHaveBeenCalled()
   })
 
   it('uses the configured HTTPS callback origin behind an HTTP proxy request', async () => {

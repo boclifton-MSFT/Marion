@@ -15,6 +15,7 @@ export interface OAuthTransaction {
   state: string
   nonce: string
   codeVerifier: string
+  redirectUri: string
   returnTo: string
   issuedAt: number
 }
@@ -86,6 +87,7 @@ export function safeReturnTo(value: unknown): string {
 export function createOAuthTransaction(
   values: Pick<OAuthTransaction, 'state' | 'nonce' | 'codeVerifier'>,
   transactionId: string,
+  redirectUri: string,
   returnTo: string,
   now: number
 ): OAuthTransaction {
@@ -94,6 +96,7 @@ export function createOAuthTransaction(
     state: values.state,
     nonce: values.nonce,
     codeVerifier: values.codeVerifier,
+    redirectUri,
     returnTo: safeReturnTo(returnTo),
     issuedAt: now
   }
@@ -109,11 +112,28 @@ export function isCurrentOAuthTransaction(value: unknown, now: number): value is
     && isNonEmptyString(transaction.state)
     && isNonEmptyString(transaction.nonce)
     && isNonEmptyString(transaction.codeVerifier)
+    && isValidRedirectUri(transaction.redirectUri)
     && isNonEmptyString(transaction.returnTo)
     && isTimestamp(transaction.issuedAt)
     && transaction.issuedAt <= now
     && now - transaction.issuedAt <= OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000
     && safeReturnTo(transaction.returnTo) === transaction.returnTo
+}
+
+function isValidRedirectUri(value: unknown): value is string {
+  if (!isNonEmptyString(value)) {
+    return false
+  }
+
+  try {
+    const redirectUri = new URL(value)
+    return redirectUri.protocol === 'https:'
+      && redirectUri.pathname === '/auth/google/callback'
+      && !redirectUri.search
+      && !redirectUri.hash
+  } catch {
+    return false
+  }
 }
 
 export function createMarionSession(userId: string, sessionId: string, now: number): MarionSession {

@@ -1,7 +1,7 @@
 import { createSign, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import * as oidc from 'openid-client'
-import { completeAuthorization } from './oidc'
+import { authorizationUrl, completeAuthorization } from './oidc'
 import type { OAuthTransaction } from './security'
 import type { OidcRuntimeSettings } from './runtime'
 
@@ -17,6 +17,7 @@ const transaction: OAuthTransaction = {
   state: 'state-value',
   nonce: 'nonce-value',
   codeVerifier: 'pkce-verifier',
+  redirectUri: settings.redirectUri,
   returnTo: '/',
   issuedAt: 1_750_000_000_000
 }
@@ -69,6 +70,7 @@ function configuration(
     }
     if (url.pathname === '/token') {
       expect(String(init?.body)).toContain('code=authorization-code')
+      expect(String(init?.body)).toContain(`redirect_uri=${encodeURIComponent(transaction.redirectUri)}`)
       return Response.json({
         access_token: 'test-access-token',
         token_type: 'Bearer',
@@ -82,13 +84,31 @@ function configuration(
 }
 
 describe('OIDC ID-token verification', () => {
+  it('builds an authorization request with every required OIDC parameter', async () => {
+    const config = configuration(Math.floor(Date.now() / 1000))
+    const url = await authorizationUrl(config, {
+      ...settings,
+      redirectUri: 'https://changed.example.test/auth/google/callback'
+    }, transaction)
+
+    expect(url.searchParams.get('response_type')).toBe('code')
+    expect(url.searchParams.get('state')).toBe(transaction.state)
+    expect(url.searchParams.get('nonce')).toBe(transaction.nonce)
+    expect(url.searchParams.get('code_challenge')).toBe(
+      await oidc.calculatePKCECodeChallenge(transaction.codeVerifier)
+    )
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    expect(url.searchParams.get('redirect_uri')).toBe(transaction.redirectUri)
+    expect(url.searchParams.getAll('scope')).toEqual(['openid email profile'])
+  })
+
   it('accepts a token whose signature validates against the issuer JWKS', async () => {
     const now = Date.now()
     const config = configuration(Math.floor(now / 1000))
 
     await expect(completeAuthorization(
       config,
-      settings,
+      { ...settings, redirectUri: 'https://changed.example.test/auth/google/callback' },
       transaction,
       '?code=authorization-code&state=state-value',
       now
