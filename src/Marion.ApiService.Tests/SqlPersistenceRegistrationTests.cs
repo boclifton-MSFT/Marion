@@ -86,15 +86,61 @@ public sealed class SqlPersistenceRegistrationTests
     }
 
     [Fact]
-    public void Entra_connection_configuration_does_not_acquire_a_token()
+    public void Azure_mode_uses_persistence_registration_from_the_program_composition_root()
+    {
+        using var factory = new MarionApiFactory("Testing").WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting($"{PlatformOptions.SectionName}:Mode", "Azure");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:BlobServiceUri",
+                "https://documents.blob.core.windows.net");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:BlobContainerName",
+                "documents");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace",
+                "messaging.servicebus.windows.net");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:SqlServer",
+                "marion.database.windows.net");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:SqlDatabase",
+                "marion");
+            builder.UseSetting(
+                $"{PlatformOptions.SectionName}:Azure:Identity:TenantId",
+                "tenant-id");
+        });
+
+        var tokenCredential = factory.Services.GetRequiredService<TokenCredential>();
+        var interceptor = factory.Services.GetRequiredService<SqlEntraConnectionInterceptor>();
+
+        using var scope = factory.Services.CreateScope();
+        using var dbContext = scope.ServiceProvider.GetRequiredService<MarionDbContext>();
+        var sqlConnection = Assert.IsType<SqlConnection>(
+            dbContext.Database.GetDbConnection());
+
+        interceptor.ConfigureConnection(sqlConnection);
+
+        Assert.Same(tokenCredential, interceptor.Credential);
+        Assert.Equal("marion.database.windows.net", sqlConnection.DataSource);
+        Assert.Equal("marion", sqlConnection.Database);
+        Assert.Contains("Encrypt=True", sqlConnection.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(sqlConnection.AccessTokenCallback);
+    }
+
+    [Fact]
+    public void Entra_connection_configuration_reuses_the_callback_across_connections()
     {
         var credential = new RecordingTokenCredential();
         var interceptor = new SqlEntraConnectionInterceptor(credential);
-        using var connection = new SqlConnection();
+        using var firstConnection = new SqlConnection();
+        using var secondConnection = new SqlConnection();
 
-        interceptor.ConfigureConnection(connection);
+        interceptor.ConfigureConnection(firstConnection);
+        interceptor.ConfigureConnection(secondConnection);
 
-        Assert.NotNull(connection.AccessTokenCallback);
+        Assert.NotNull(firstConnection.AccessTokenCallback);
+        Assert.Same(firstConnection.AccessTokenCallback, secondConnection.AccessTokenCallback);
         Assert.Equal(0, credential.RequestCount);
     }
 

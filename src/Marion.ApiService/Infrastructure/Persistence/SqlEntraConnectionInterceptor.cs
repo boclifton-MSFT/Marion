@@ -5,10 +5,21 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Marion.ApiService.Infrastructure.Persistence;
 
-internal sealed class SqlEntraConnectionInterceptor(TokenCredential credential)
-    : DbConnectionInterceptor
+internal sealed class SqlEntraConnectionInterceptor : DbConnectionInterceptor
 {
-    internal TokenCredential Credential { get; } = credential;
+    private readonly Func<
+        SqlAuthenticationParameters,
+        CancellationToken,
+        Task<SqlAuthenticationToken>> accessTokenCallback;
+
+    public SqlEntraConnectionInterceptor(TokenCredential credential)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        Credential = credential;
+        accessTokenCallback = GetAccessTokenAsync;
+    }
+
+    internal TokenCredential Credential { get; }
 
     public override InterceptionResult ConnectionOpening(
         DbConnection connection,
@@ -36,19 +47,23 @@ internal sealed class SqlEntraConnectionInterceptor(TokenCredential credential)
             return;
         }
 
-        sqlConnection.AccessTokenCallback = async (authenticationParameters, cancellationToken) =>
-        {
-            var resource = authenticationParameters.Resource;
-            var scope = resource.EndsWith(
-                    "/.default",
-                    StringComparison.OrdinalIgnoreCase)
-                ? resource
-                : $"{resource}/.default";
-            var token = await Credential.GetTokenAsync(
-                new TokenRequestContext([scope]),
-                cancellationToken);
+        sqlConnection.AccessTokenCallback = accessTokenCallback;
+    }
 
-            return new SqlAuthenticationToken(token.Token, token.ExpiresOn);
-        };
+    private async Task<SqlAuthenticationToken> GetAccessTokenAsync(
+        SqlAuthenticationParameters authenticationParameters,
+        CancellationToken cancellationToken)
+    {
+        var resource = authenticationParameters.Resource;
+        var scope = resource.EndsWith(
+                "/.default",
+                StringComparison.OrdinalIgnoreCase)
+            ? resource
+            : $"{resource}/.default";
+        var token = await Credential.GetTokenAsync(
+            new TokenRequestContext([scope]),
+            cancellationToken);
+
+        return new SqlAuthenticationToken(token.Token, token.ExpiresOn);
     }
 }

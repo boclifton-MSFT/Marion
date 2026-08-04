@@ -35,13 +35,12 @@ if (integrationTesting)
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.AddSqlServerDbContext<MarionDbContext>(
-    "mariondb",
+builder.AddMarionPersistence(
     settings =>
     {
         settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
         settings.DisableRetry = integrationTesting;
-        settings.CommandTimeout = integrationTesting ? 3 : null;
+        settings.CommandTimeoutSeconds = integrationTesting ? 3 : null;
     });
 builder.AddAzureBlobContainerClient(
     "documents",
