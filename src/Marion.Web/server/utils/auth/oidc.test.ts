@@ -28,7 +28,8 @@ function base64Json(value: object): string {
 
 function signedIdToken(
   privateKey: KeyObject,
-  nowSeconds: number
+  nowSeconds: number,
+  claimOverrides: Record<string, unknown> = {}
 ): string {
   const signed = `${base64Json({ alg: 'RS256', kid: 'test-key', typ: 'JWT' })}.${base64Json({
     iss: settings.issuer,
@@ -36,7 +37,8 @@ function signedIdToken(
     sub: 'provider-subject',
     nonce: transaction.nonce,
     iat: nowSeconds - 20,
-    exp: nowSeconds + 10 * 60
+    exp: nowSeconds + 10 * 60,
+    ...claimOverrides
   })}`
   const signer = createSign('RSA-SHA256')
   signer.update(signed)
@@ -44,10 +46,14 @@ function signedIdToken(
   return `${signed}.${signer.sign(privateKey).toString('base64url')}`
 }
 
-function configuration(nowSeconds: number, tamperKey = false): oidc.Configuration {
+function configuration(
+  nowSeconds: number,
+  claimOverrides: Record<string, unknown> = {},
+  tamperKey = false
+): oidc.Configuration {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const jwk = publicKey.export({ format: 'jwk' })
-  const token = signedIdToken(privateKey as KeyObject, nowSeconds)
+  const token = signedIdToken(privateKey as KeyObject, nowSeconds, claimOverrides)
   const config = new oidc.Configuration({
     issuer: settings.issuer,
     authorization_endpoint: `${settings.issuer}/authorize`,
@@ -76,6 +82,20 @@ function configuration(nowSeconds: number, tamperKey = false): oidc.Configuratio
   oidc.enableNonRepudiationChecks(config)
   return config
 }
+
+const invalidClaimCases: Array<[
+  string,
+  (nowSeconds: number) => Record<string, unknown>
+]> = [
+  ['issuer', () => ({ iss: 'https://attacker.example.test' })],
+  ['audience', () => ({ aud: 'another-client' })],
+  ['nonce', () => ({ nonce: 'another-nonce' })],
+  ['expiry', () => ({ exp: 1 })],
+  ['old issued-at', nowSeconds => ({ iat: nowSeconds - 10 * 60 - 1 })],
+  ['future issued-at', nowSeconds => ({ iat: nowSeconds + 61 })],
+  ['missing subject', () => ({ sub: undefined })],
+  ['empty subject', () => ({ sub: '' })]
+]
 
 describe('OIDC ID-token verification', () => {
   it('builds an authorization request with every required OIDC parameter', async () => {
@@ -114,7 +134,7 @@ describe('OIDC ID-token verification', () => {
 
   it('rejects an ID token when no issuer JWKS key validates its signature', async () => {
     const now = Date.now()
-    const config = configuration(Math.floor(now / 1000), true)
+    const config = configuration(Math.floor(now / 1000), {}, true)
 
     await expect(completeAuthorization(
       config,
@@ -124,4 +144,23 @@ describe('OIDC ID-token verification', () => {
       now
     )).rejects.toThrow()
   })
+
+  it.each(invalidClaimCases)(
+    'fails closed for an invalid %s in a signed provider token',
+    async (_, claims) => {
+      const now = Date.now()
+      const nowSeconds = Math.floor(now / 1000)
+      const config = configuration(nowSeconds, claims(nowSeconds))
+
+      const identity = await completeAuthorization(
+        config,
+        settings,
+        transaction,
+        '?code=authorization-code&state=state-value',
+        now
+      ).catch(() => undefined)
+
+      expect(identity).toBeUndefined()
+    }
+  )
 })
