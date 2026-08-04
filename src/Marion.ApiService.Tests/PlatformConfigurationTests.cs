@@ -1,9 +1,13 @@
 extern alias AppHost;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Json;
+using Azure;
 using Azure.Core;
+using Azure.Core.Pipeline;
 using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
 using Aspire.Hosting.Testing;
 using Marion.ApiService.Features.System;
 using Marion.ApiService.Infrastructure.Configuration;
@@ -11,6 +15,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Xunit;
 using AppHostProjects = AppHost::Projects;
@@ -80,7 +85,7 @@ public sealed class PlatformConfigurationTests
             builder.UseSetting("Marion:Platform:Mode", "Azure");
             builder.UseSetting(
                 "Marion:Platform:Azure:BlobServiceUri",
-                "https://documents.blob.core.windows.net");
+                "https://documents.blob.core.windows.net/");
             builder.UseSetting(
                 "Marion:Platform:Azure:BlobContainerName",
                 "documents");
@@ -123,7 +128,7 @@ public sealed class PlatformConfigurationTests
         Assert.Null(factory.Services.GetService<AzureCliCredential>());
         Assert.Null(options.Local.BlobServiceUri);
         Assert.Equal(
-            "https://documents.blob.core.windows.net",
+            "https://documents.blob.core.windows.net/",
             options.Azure.BlobServiceUri);
         Assert.Equal(
             "user-assigned-client-id",
@@ -174,6 +179,70 @@ public sealed class PlatformConfigurationTests
     }
 
     [Fact]
+    public void Azure_mode_rejects_credential_bearing_and_malformed_Blob_service_endpoints()
+    {
+        var invalidEndpoints = new[]
+        {
+            "https://documents.blob.core.windows.net/?sv=2026-01-01&sig=redacted",
+            "https://identity@documents.blob.core.windows.net",
+            "https://documents.blob.core.windows.net/container",
+            "https://documents.blob.core.windows.net/#fragment",
+            "not-a-uri"
+        };
+
+        foreach (var invalidEndpoint in invalidEndpoints)
+        {
+            var exception = ResolveOptions(CreateAzureSettings(invalidEndpoint));
+
+            Assert.Contains(
+                "Marion:Platform:Azure:BlobServiceUri",
+                exception.Message,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                invalidEndpoint,
+                exception.ToString(),
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Azure_mode_Key_Vault_uses_the_shared_credential_without_startup_token_acquisition()
+    {
+        var credential = new ProbeTokenCredential();
+        using var factory = new MarionApiFactory("Testing").WithWebHostBuilder(builder =>
+        {
+            foreach (var setting in CreateAzureSettings(
+                "https://documents.blob.core.windows.net"))
+            {
+                builder.UseSetting(setting.Key, setting.Value);
+            }
+
+            builder.UseSetting(
+                "ConnectionStrings:marionkv",
+                "https://credential-probe.vault.azure.net");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<TokenCredential>();
+                services.AddSingleton<TokenCredential>(credential);
+                services.PostConfigureAll<SecretClientOptions>(options =>
+                    options.Transport = new KeyVaultChallengeTransport());
+            });
+        });
+
+        var client = factory.Services.GetRequiredService<SecretClient>();
+
+        Assert.Same(
+            credential,
+            factory.Services.GetRequiredService<TokenCredential>());
+        Assert.Equal(0, credential.RequestCount);
+
+        var exception = await Record.ExceptionAsync(async () =>
+            await client.GetSecretAsync("credential-probe"));
+
+        Assert.True(credential.RequestCount > 0, exception?.ToString());
+    }
+
+    [Fact]
     public async Task AppHost_named_references_start_the_API_with_local_platform_configuration()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
@@ -213,5 +282,114 @@ public sealed class PlatformConfigurationTests
         using var host = builder.Build();
         return Assert.Throws<OptionsValidationException>(() =>
             host.Services.GetRequiredService<IOptions<PlatformOptions>>().Value);
+    }
+
+    private static Dictionary<string, string?> CreateAzureSettings(
+        string blobServiceUri) =>
+        new()
+        {
+            [$"{PlatformOptions.SectionName}:Mode"] = "Azure",
+            [$"{PlatformOptions.SectionName}:Azure:BlobServiceUri"] = blobServiceUri,
+            [$"{PlatformOptions.SectionName}:Azure:BlobContainerName"] = "documents",
+            [$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+                "messaging.servicebus.windows.net",
+            [$"{PlatformOptions.SectionName}:Azure:SqlServer"] =
+                "marion.database.windows.net",
+            [$"{PlatformOptions.SectionName}:Azure:SqlDatabase"] = "marion",
+            [$"{PlatformOptions.SectionName}:Azure:Identity:TenantId"] = "tenant-id"
+        };
+
+    private sealed class ProbeTokenCredential : TokenCredential
+    {
+        internal int RequestCount { get; private set; }
+
+        public override AccessToken GetToken(
+            TokenRequestContext requestContext,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            throw new InvalidOperationException("Credential probe completed.");
+        }
+
+        public override ValueTask<AccessToken> GetTokenAsync(
+            TokenRequestContext requestContext,
+            CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            throw new InvalidOperationException("Credential probe completed.");
+        }
+    }
+
+    private sealed class KeyVaultChallengeTransport : HttpPipelineTransport
+    {
+        private readonly HttpPipelineTransport requestFactory = new HttpClientTransport();
+
+        public override Request CreateRequest() => requestFactory.CreateRequest();
+
+        public override void Process(HttpMessage message) =>
+            message.Response = new KeyVaultChallengeResponse();
+
+        public override ValueTask ProcessAsync(HttpMessage message)
+        {
+            Process(message);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class KeyVaultChallengeResponse : Response
+    {
+        private const string Challenge =
+            "Bearer authorization=\"https://login.microsoftonline.com/tenant\", "
+            + "resource=\"https://vault.azure.net\"";
+
+        public override int Status => 401;
+
+        public override string ReasonPhrase => "Unauthorized";
+
+        public override Stream? ContentStream { get; set; }
+
+        public override string ClientRequestId { get; set; } = string.Empty;
+
+        protected override bool TryGetHeader(
+            string name,
+            [NotNullWhen(true)] out string? value)
+        {
+            value = string.Equals(
+                name,
+                "WWW-Authenticate",
+                StringComparison.OrdinalIgnoreCase)
+                ? Challenge
+                : null;
+            return value is not null;
+        }
+
+        protected override bool TryGetHeaderValues(
+            string name,
+            [NotNullWhen(true)] out IEnumerable<string>? values)
+        {
+            if (TryGetHeader(name, out var value))
+            {
+                values = [value];
+                return true;
+            }
+
+            values = null;
+            return false;
+        }
+
+        protected override bool ContainsHeader(string name) =>
+            string.Equals(
+                name,
+                "WWW-Authenticate",
+                StringComparison.OrdinalIgnoreCase);
+
+        protected override IEnumerable<HttpHeader> EnumerateHeaders() =>
+            [new HttpHeader("WWW-Authenticate", Challenge)];
+
+        public override void Dispose()
+        {
+            ContentStream?.Dispose();
+            ContentStream = null;
+        }
     }
 }

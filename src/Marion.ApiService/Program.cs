@@ -9,6 +9,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 var integrationTesting = builder.Environment.IsEnvironment("IntegrationTesting");
+var platformMode = PlatformConfigurationExtensions.ParseMode(
+    builder.Configuration[PlatformOptions.SectionName + ":Mode"]);
 
 builder.AddPlatformConfiguration();
 if (!integrationTesting)
@@ -18,6 +20,15 @@ if (!integrationTesting)
         settings =>
         {
             settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
+        },
+        clientBuilder =>
+        {
+            if (platformMode == PlatformMode.Azure)
+            {
+                clientBuilder.WithCredential(
+                    serviceProvider =>
+                        serviceProvider.GetRequiredService<Azure.Core.TokenCredential>());
+            }
         });
 }
 

@@ -257,7 +257,7 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
         var failures = new List<string>();
         var azure = options.Azure;
 
-        RequireHttpsUri(
+        RequireBlobServiceUri(
             failures,
             "Marion:Platform:Azure:BlobServiceUri",
             azure.BlobServiceUri);
@@ -328,16 +328,21 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
         }
     }
 
-    private static void RequireHttpsUri(
+    private static void RequireBlobServiceUri(
         ICollection<string> failures,
         string settingName,
         string? value)
     {
         if (!TryCreateUri(value, out var uri)
             || uri is null
-            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || !string.Equals(uri.AbsolutePath, "/", StringComparison.Ordinal))
         {
-            failures.Add($"{settingName} must be an absolute HTTPS URI in Azure mode.");
+            failures.Add(
+                $"{settingName} must be a credential-free HTTPS Blob service root URI in Azure mode.");
         }
     }
 

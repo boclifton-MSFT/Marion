@@ -72,7 +72,9 @@ var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription");
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
-    .WithEnvironment("Marion__Platform__Mode", "Local")
+    .WithEnvironment(context =>
+        context.EnvironmentVariables["Marion__Platform__Mode"] =
+            context.ExecutionContext.IsPublishMode ? "Azure" : "Local")
     .WithReference(marionDb)
     .WaitFor(marionDb)
     .WithReference(documents)

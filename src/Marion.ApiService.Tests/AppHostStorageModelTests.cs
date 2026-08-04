@@ -1,5 +1,6 @@
 extern alias AppHost;
 
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
@@ -12,7 +13,7 @@ namespace Marion.ApiService.Tests;
 public sealed class AppHostStorageModelTests
 {
     [Fact]
-    public async Task Development_models_persistent_private_document_storage()
+    public async Task Run_and_publish_models_select_the_matching_platform_mode()
     {
         await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
@@ -49,6 +50,18 @@ public sealed class AppHostStorageModelTests
         Assert.Contains(
             annotations[apiService].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == documents);
+
+        var runEnvironment = await ResolveEnvironmentAsync(
+            apiService,
+            annotations[apiService],
+            DistributedApplicationOperation.Run);
+        var publishEnvironment = await ResolveEnvironmentAsync(
+            apiService,
+            annotations[apiService],
+            DistributedApplicationOperation.Publish);
+
+        Assert.Equal("Local", runEnvironment["Marion__Platform__Mode"]);
+        Assert.Equal("Azure", publishEnvironment["Marion__Platform__Mode"]);
     }
 
     [Fact]
@@ -97,5 +110,29 @@ public sealed class AppHostStorageModelTests
         Assert.Contains(
             annotations[apiService].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == documents);
+    }
+
+    private static async Task<Dictionary<string, object>> ResolveEnvironmentAsync(
+        IResource resource,
+        IEnumerable<IResourceAnnotation> annotations,
+        DistributedApplicationOperation operation)
+    {
+        foreach (var annotation in annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            var environment = new Dictionary<string, object>();
+            var context = new EnvironmentCallbackContext(
+                new DistributedApplicationExecutionContext(operation),
+                resource,
+                environment);
+            await annotation.Callback(context);
+
+            if (environment.ContainsKey("Marion__Platform__Mode"))
+            {
+                return environment;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "The API platform mode environment callback is missing.");
     }
 }
