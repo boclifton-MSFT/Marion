@@ -1,7 +1,18 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { SessionConfig } from 'h3'
+import {
+  DEFAULT_RETURN_TO,
+  isProtectedPath,
+  safeProtectedReturnTo,
+  safeReturnTo
+} from '../../../shared/auth/return-to'
 
-export const DEFAULT_RETURN_TO = '/'
+export {
+  DEFAULT_RETURN_TO,
+  isProtectedPath,
+  safeProtectedReturnTo,
+  safeReturnTo
+}
 export const ID_TOKEN_CLOCK_SKEW_SECONDS = 60
 export const ID_TOKEN_MAX_AGE_SECONDS = 10 * 60
 export const OAUTH_TRANSACTION_MAX_AGE_SECONDS = 5 * 60
@@ -56,32 +67,6 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isTimestamp(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-}
-
-export function safeReturnTo(value: unknown): string {
-  if (!isNonEmptyString(value) || !value.startsWith('/') || value.startsWith('//')) {
-    return DEFAULT_RETURN_TO
-  }
-
-  let decoded: string
-  try {
-    decoded = decodeURIComponent(value)
-  } catch {
-    return DEFAULT_RETURN_TO
-  }
-
-  if (value.includes('\\') || decoded.includes('\\') || decoded.startsWith('//')) {
-    return DEFAULT_RETURN_TO
-  }
-
-  try {
-    const target = new URL(value, 'https://marion.invalid')
-    return target.origin === 'https://marion.invalid'
-      ? `${target.pathname}${target.search}${target.hash}`
-      : DEFAULT_RETURN_TO
-  } catch {
-    return DEFAULT_RETURN_TO
-  }
 }
 
 export function createOAuthTransaction(

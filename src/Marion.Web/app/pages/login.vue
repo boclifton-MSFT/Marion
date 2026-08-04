@@ -34,6 +34,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { googleSignInPath } from '../../shared/auth/return-to'
 
 definePageMeta({
   layout: 'auth'
@@ -45,6 +46,7 @@ useSeoMeta({
 })
 
 const toast = useToast()
+const route = useRoute()
 
 const fields = [{
   name: 'email',
@@ -67,7 +69,7 @@ const providers = [{
   label: 'Google',
   icon: 'i-simple-icons-google',
   onClick: () => {
-    window.location.assign('/auth/google')
+    window.location.assign(googleSignInPath(route.query.returnTo))
   }
 }, {
   label: 'GitHub',

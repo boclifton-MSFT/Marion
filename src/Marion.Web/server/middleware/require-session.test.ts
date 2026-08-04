@@ -18,6 +18,13 @@ Object.assign(globalThis, {
 })
 
 type TouchMode = 'stale' | 'revoked'
+const PUBLIC_ROUTES = [
+  '/',
+  '/pricing',
+  '/blog',
+  '/changelog',
+  '/docs/getting-started'
+] as const
 
 function createDependencies(touchMode?: TouchMode) {
   const sessions = new Map<string, MarionSession>()
@@ -92,6 +99,10 @@ async function startServer(touchMode?: TouchMode) {
     await rotateMarionSession(event, 'marion-user', dependencies)
     return { seeded: true }
   }))
+  for (const path of PUBLIC_ROUTES) {
+    router.get(path, defineEventHandler(() => ({ public: path })))
+  }
+  router.get('/app', defineEventHandler(() => ({ protected: true })))
   router.get('/app/future-loan', defineEventHandler(() => ({ protected: true })))
   app.use(router)
 
@@ -130,22 +141,43 @@ describe('protected SSR route middleware', () => {
     await Promise.all(servers.splice(0).map(server => server.close()))
   })
 
-  it('redirects an anonymous future protected route and permits a durable session', async () => {
+  it.each([
+    ['/app', '/login?returnTo=%2Fapp'],
+    [
+      '/app/future-loan?tab=details',
+      '/login?returnTo=%2Fapp%2Ffuture-loan%3Ftab%3Ddetails'
+    ]
+  ])('redirects anonymous protected route %s and permits a durable session', async (
+    protectedPath,
+    expectedLocation
+  ) => {
     const server = await startServer()
     servers.push(server)
 
-    const anonymous = await fetch(`${server.baseUrl}/app/future-loan?tab=details`, {
+    const anonymous = await fetch(`${server.baseUrl}${protectedPath}`, {
       redirect: 'manual'
     })
     const seed = await fetch(`${server.baseUrl}/test/seed-session`)
-    const authenticated = await fetch(`${server.baseUrl}/app/future-loan`, {
+    const authenticated = await fetch(`${server.baseUrl}${protectedPath}`, {
       headers: { cookie: requestCookie(seed) }
     })
 
     expect(anonymous.status).toBe(302)
-    expect(anonymous.headers.get('location')).toBe('/login?returnTo=%2Fapp%2Ffuture-loan%3Ftab%3Ddetails')
+    expect(anonymous.headers.get('location')).toBe(expectedLocation)
     expect(authenticated.status).toBe(200)
     await expect(authenticated.json()).resolves.toEqual({ protected: true })
+  })
+
+  it.each(PUBLIC_ROUTES)('does not block the named anonymous route %s', async (path) => {
+    const server = await startServer()
+    servers.push(server)
+
+    const response = await fetch(`${server.baseUrl}${path}`, {
+      redirect: 'manual'
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ public: path })
   })
 
   it('keeps a valid session signed in when a concurrent request has already touched it', async () => {

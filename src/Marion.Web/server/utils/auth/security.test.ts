@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculatePKCECodeChallenge } from 'openid-client'
+import { googleSignInPath } from '../../../shared/auth/return-to'
 import {
   DEFAULT_RETURN_TO,
   ID_TOKEN_MAX_AGE_SECONDS,
@@ -11,6 +12,7 @@ import {
   createMarionSession,
   createOAuthTransaction,
   isCurrentOAuthTransaction,
+  safeProtectedReturnTo,
   safeReturnTo,
   sessionCookieConfig,
   sessionIsActive,
@@ -79,6 +81,31 @@ describe('OIDC transaction security', () => {
     ['/docs/getting-started?section=oidc', '/docs/getting-started?section=oidc']
   ])('only accepts local return paths: %s', (value, expected) => {
     expect(safeReturnTo(value)).toBe(expected)
+  })
+
+  it.each([
+    ['/app', '/app'],
+    ['/app/loans/123?tab=details', '/app/loans/123?tab=details'],
+    ['/app-like', DEFAULT_RETURN_TO],
+    ['/pricing', DEFAULT_RETURN_TO],
+    ['https://attacker.example/app', DEFAULT_RETURN_TO],
+    ['//attacker.example/app', DEFAULT_RETURN_TO],
+    ['/app\\attacker.example', DEFAULT_RETURN_TO]
+  ])('only preserves protected application return targets: %s', (value, expected) => {
+    expect(safeProtectedReturnTo(value)).toBe(expected)
+  })
+
+  it.each([
+    ['/app', '/auth/google?returnTo=%2Fapp'],
+    [
+      '/app/loans/123?tab=details',
+      '/auth/google?returnTo=%2Fapp%2Floans%2F123%3Ftab%3Ddetails'
+    ],
+    ['/pricing', '/auth/google'],
+    ['https://attacker.example/app', '/auth/google'],
+    [undefined, '/auth/google']
+  ])('builds a safe Google sign-in path for return target %s', (value, expected) => {
+    expect(googleSignInPath(value)).toBe(expected)
   })
 })
 
