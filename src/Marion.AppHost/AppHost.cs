@@ -11,11 +11,16 @@ var integrationTesting = string.Equals(
 var googleClientId = builder.AddParameter("GoogleClientId");
 var googleClientSecret = builder.AddParameter("GoogleClientSecret", secret: true);
 
-var keyVault = builder.AddAzureKeyVault("marionkv");
-keyVault.AddSecret("google-client-id", googleClientId);
-keyVault.AddSecret("google-client-secret", googleClientSecret);
+var keyVault = integrationTesting
+    ? null
+    : builder.AddAzureKeyVault("marionkv");
 
-var sql = builder.AddSqlServer("sql");
+if (keyVault is not null)
+{
+    keyVault.AddSecret("google-client-id", googleClientId);
+    keyVault.AddSecret("google-client-secret", googleClientSecret);
+}
+
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(emulator =>
     {
@@ -30,6 +35,7 @@ var storage = builder.AddAzureStorage("storage")
         }
     });
 var messaging = builder.AddAzureServiceBus("messaging")
+    .ClearDefaultRoleAssignments()
     .RunAsEmulator(emulator =>
     {
         emulator.WithConfiguration(configuration =>
@@ -48,13 +54,6 @@ var messaging = builder.AddAzureServiceBus("messaging")
         });
     });
 
-if (!integrationTesting)
-{
-    sql.WithDataVolume()
-        .WithLifetime(ContainerLifetime.Persistent);
-}
-
-var marionDb = sql.AddDatabase("mariondb");
 var documents = storage.AddBlobContainer("documents", "test-files");
 var documentProcessing = messaging.AddServiceBusQueue(
     "document-processing",
@@ -63,34 +62,87 @@ var loanEvents = messaging.AddServiceBusTopic("loan-events", "loan-events");
 var loanEventsSubscription = loanEvents.AddServiceBusSubscription(
     "loan-events-subscription",
     "loan-events-subscription");
+var azureSqlServer = builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("azure-sql-server")
+    : null;
+var azureSqlDatabase = builder.ExecutionContext.IsPublishMode
+    ? builder.AddParameter("azure-sql-database")
+    : null;
 
 var apiService = builder.AddProject<Projects.Marion_ApiService>("apiservice")
-    .WithReference(keyVault)
-    .WithReference(marionDb)
-    .WaitFor(marionDb)
+    .WithEnvironment(context =>
+    {
+        if (context.ExecutionContext.IsRunMode)
+        {
+            context.EnvironmentVariables["Marion__Platform__Mode"] = "Local";
+            return;
+        }
+
+        if (!context.ExecutionContext.IsPublishMode
+            || azureSqlServer is null
+            || azureSqlDatabase is null)
+        {
+            throw new InvalidOperationException(
+                "The API publish environment requires the Azure deployment parameters.");
+        }
+
+        context.EnvironmentVariables["Marion__Platform__Mode"] = "Azure";
+        context.EnvironmentVariables["Marion__Platform__Azure__BlobServiceUri"] =
+            storage.Resource.BlobUriExpression;
+        context.EnvironmentVariables["Marion__Platform__Azure__BlobContainerName"] =
+            documents.Resource.BlobContainerName;
+        context.EnvironmentVariables[
+                "Marion__Platform__Azure__ServiceBusFullyQualifiedNamespace"] =
+            messaging.Resource.HostName;
+        context.EnvironmentVariables["Marion__Platform__Azure__SqlServer"] =
+            azureSqlServer.Resource;
+        context.EnvironmentVariables["Marion__Platform__Azure__SqlDatabase"] =
+            azureSqlDatabase.Resource;
+    })
     .WithReference(documents)
     .WaitFor(documents)
     .WithReference(messaging)
     .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
 
+if (keyVault is not null)
+{
+    apiService.WithReference(keyVault);
+}
+
 if (integrationTesting)
 {
     apiService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "IntegrationTesting");
 }
-else
-{
-    builder.AddViteApp("frontend", "../Marion.Web")
+var frontend = integrationTesting
+    ? null
+    : builder.AddViteApp("frontend", "../Marion.Web")
         .WithPnpm()
         .WithHttpsEndpoint(port: 7257, env: "PORT")
         .WithHttpsDeveloperCertificate()
         .WithExternalHttpEndpoints()
-        .WithReference(marionDb)
-        .WaitFor(marionDb)
         .WithReference(apiService)
         .WaitFor(apiService)
-        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"))
-        .WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true");
+        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"));
+
+if (builder.ExecutionContext.IsRunMode)
+{
+    var sql = builder.AddSqlServer("sql");
+    if (!integrationTesting)
+    {
+        sql.WithDataVolume()
+            .WithLifetime(ContainerLifetime.Persistent);
+    }
+    var marionDb = sql.AddDatabase("mariondb");
+
+    apiService.WithReference(marionDb)
+        .WaitFor(marionDb);
+    if (frontend is not null)
+    {
+        frontend.WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true")
+            .WithReference(marionDb)
+            .WaitFor(marionDb);
+    }
 }
 
 builder.Build().Run();
