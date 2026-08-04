@@ -115,8 +115,9 @@ public sealed class MessagingRegistrationTests
         var client = host.Services.GetRequiredService<ServiceBusClient>();
 
         Assert.Same(
-            host.Services.GetRequiredService<DefaultAzureCredential>(),
+            host.Services.GetRequiredService<ManagedIdentityCredential>(),
             tokenCredential);
+        Assert.Null(host.Services.GetService<DefaultAzureCredential>());
         Assert.Equal("explicit.servicebus.windows.net", client.FullyQualifiedNamespace);
     }
 

@@ -101,10 +101,11 @@ public sealed class StorageRegistrationTests
         Assert.Equal(
             "https://documents.blob.core.windows.net/documents",
             containerClient.Uri.AbsoluteUri);
-        Assert.IsType<DefaultAzureCredential>(credential);
+        Assert.IsType<ManagedIdentityCredential>(credential);
         Assert.Same(
             credential,
-            scope.ServiceProvider.GetRequiredService<DefaultAzureCredential>());
+            scope.ServiceProvider.GetRequiredService<ManagedIdentityCredential>());
+        Assert.Null(scope.ServiceProvider.GetService<DefaultAzureCredential>());
         Assert.Equal(TimeSpan.FromSeconds(5), healthRegistration.Timeout);
         Assert.Equal(
             new BlobClientOptions().Retry.NetworkTimeout,

@@ -34,6 +34,7 @@ public sealed class PlatformConfigurationTests
             "messaging.invalid",
             options.Local.ServiceBusFullyQualifiedNamespace);
         Assert.Equal("mariondb", options.Local.SqlConnectionName);
+        Assert.Null(factory.Services.GetService<ManagedIdentityCredential>());
         Assert.Null(factory.Services.GetService<DefaultAzureCredential>());
         Assert.Empty(factory.Services.GetServices<TokenCredential>());
     }
@@ -72,7 +73,7 @@ public sealed class PlatformConfigurationTests
     }
 
     [Fact]
-    public void Azure_mode_registers_one_shared_DefaultAzureCredential()
+    public void Azure_mode_registers_one_shared_deterministic_ManagedIdentityCredential()
     {
         using var factory = new MarionApiFactory("Testing").WithWebHostBuilder(builder =>
         {
@@ -95,22 +96,38 @@ public sealed class PlatformConfigurationTests
             builder.UseSetting(
                 "Marion:Platform:Azure:Identity:TenantId",
                 "tenant-id");
+            builder.UseSetting(
+                "Marion:Platform:Azure:Identity:ManagedIdentityClientId",
+                "user-assigned-client-id");
+            builder.UseSetting("AZURE_CLIENT_ID", "environment-client-id");
+            builder.UseSetting("AZURE_CLIENT_SECRET", "not-a-secret");
+            builder.UseSetting("AZURE_TENANT_ID", "environment-tenant-id");
+            builder.UseSetting(
+                "AZURE_TOKEN_CREDENTIALS",
+                nameof(VisualStudioCredential));
         });
 
         var options = factory.Services
             .GetRequiredService<IOptions<PlatformOptions>>()
             .Value;
-        var credential = factory.Services.GetRequiredService<DefaultAzureCredential>();
+        var credential = factory.Services.GetRequiredService<ManagedIdentityCredential>();
         var tokenCredential = factory.Services.GetRequiredService<TokenCredential>();
 
         Assert.Equal(PlatformMode.Azure, options.Mode);
         Assert.Same(credential, tokenCredential);
-        Assert.Single(factory.Services.GetServices<DefaultAzureCredential>());
+        Assert.Single(factory.Services.GetServices<ManagedIdentityCredential>());
         Assert.Single(factory.Services.GetServices<TokenCredential>());
+        Assert.Null(factory.Services.GetService<DefaultAzureCredential>());
+        Assert.Null(factory.Services.GetService<EnvironmentCredential>());
+        Assert.Null(factory.Services.GetService<VisualStudioCredential>());
+        Assert.Null(factory.Services.GetService<AzureCliCredential>());
         Assert.Null(options.Local.BlobServiceUri);
         Assert.Equal(
             "https://documents.blob.core.windows.net",
             options.Azure.BlobServiceUri);
+        Assert.Equal(
+            "user-assigned-client-id",
+            options.Azure.Identity.ManagedIdentityClientId);
     }
 
     [Fact]

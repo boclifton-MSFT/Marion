@@ -68,7 +68,8 @@ public sealed class SqlPersistenceRegistrationTests
             builder => builder.AddMarionPersistence());
 
         var tokenCredential = host.Services.GetRequiredService<TokenCredential>();
-        var defaultCredential = host.Services.GetRequiredService<DefaultAzureCredential>();
+        var managedIdentityCredential =
+            host.Services.GetRequiredService<ManagedIdentityCredential>();
         var interceptor = host.Services.GetRequiredService<SqlEntraConnectionInterceptor>();
 
         using var scope = host.Services.CreateScope();
@@ -77,7 +78,8 @@ public sealed class SqlPersistenceRegistrationTests
             dbContext.Database.GetDbConnection());
         interceptor.ConfigureConnection(sqlConnection);
 
-        Assert.Same(defaultCredential, tokenCredential);
+        Assert.Same(managedIdentityCredential, tokenCredential);
+        Assert.Null(host.Services.GetService<DefaultAzureCredential>());
         Assert.Same(tokenCredential, interceptor.Credential);
         Assert.Equal("marion.database.windows.net", sqlConnection.DataSource);
         Assert.Equal("marion", sqlConnection.Database);

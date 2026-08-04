@@ -79,20 +79,20 @@ internal static class PlatformConfigurationExtensions
         if (ParseMode(builder.Configuration[PlatformOptions.SectionName + ":Mode"])
             == PlatformMode.Azure)
         {
-            builder.Services.AddSingleton<DefaultAzureCredential>(serviceProvider =>
+            builder.Services.AddSingleton<ManagedIdentityCredential>(serviceProvider =>
             {
                 var options = serviceProvider
                     .GetRequiredService<IOptions<PlatformOptions>>()
                     .Value;
+                var clientId = options.Azure.Identity.ManagedIdentityClientId;
 
-                return new DefaultAzureCredential(new DefaultAzureCredentialOptions
-                {
-                    TenantId = options.Azure.Identity.TenantId,
-                    ManagedIdentityClientId = options.Azure.Identity.ManagedIdentityClientId
-                });
+                return string.IsNullOrWhiteSpace(clientId)
+                    ? new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned)
+                    : new ManagedIdentityCredential(
+                        ManagedIdentityId.FromUserAssignedClientId(clientId.Trim()));
             });
             builder.Services.AddSingleton<TokenCredential>(serviceProvider =>
-                serviceProvider.GetRequiredService<DefaultAzureCredential>());
+                serviceProvider.GetRequiredService<ManagedIdentityCredential>());
         }
 
         return builder;
