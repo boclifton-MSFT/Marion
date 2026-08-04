@@ -35,8 +35,12 @@ public sealed class MessagingRegistrationTests
         Assert.DoesNotContain("live", messagingRegistration.Tags);
         Assert.Equal(HealthStatus.Unhealthy, messagingRegistration.FailureStatus);
         Assert.Equal(
-            MessagingServiceCollectionExtensions.ConnectivityTimeout,
+            MessagingServiceCollectionExtensions.HealthCheckRegistrationTimeout,
             messagingRegistration.Timeout);
+        Assert.True(
+            messagingRegistration.Timeout
+                > MessagingServiceCollectionExtensions.ConnectivityTimeout);
+        Assert.Single(scope.ServiceProvider.GetServices<ServiceBusClient>());
     }
 
     [Fact]
@@ -54,6 +58,7 @@ public sealed class MessagingRegistrationTests
             registrations,
             registration => registration.Name == "Azure_ServiceBusClient");
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ServiceBusClient>());
+        Assert.Single(scope.ServiceProvider.GetServices<ServiceBusClient>());
         Assert.NotNull(
             scope.ServiceProvider.GetRequiredService<IPlatformIntegrationPublisher>());
     }
@@ -115,6 +120,38 @@ public sealed class MessagingRegistrationTests
         Assert.Equal("explicit.servicebus.windows.net", client.FullyQualifiedNamespace);
     }
 
+    [Theory]
+    [InlineData("Local")]
+    [InlineData("Azure")]
+    public void Composition_registers_exactly_one_unkeyed_Service_Bus_client(
+        string platformMode)
+    {
+        var builder = CreateBuilder(
+            new Dictionary<string, string?>
+            {
+                [$"{PlatformOptions.SectionName}:Mode"] = platformMode,
+                [$"{PlatformOptions.SectionName}:Local:ServiceBusFullyQualifiedNamespace"] =
+                    "sbemulatorns",
+                [$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+                    "explicit.servicebus.windows.net",
+                [$"{PlatformOptions.SectionName}:Azure:Identity:TenantId"] = "tenant-id",
+                ["ConnectionStrings:messaging"] =
+                    "Endpoint=sb://emulator.local:5672/;"
+                    + "SharedAccessKeyName=RootManageSharedAccessKey;"
+                    + "SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true"
+            });
+
+        var descriptors = builder.Services
+            .Where(descriptor =>
+                descriptor.ServiceType == typeof(ServiceBusClient)
+                && descriptor.ServiceKey is null)
+            .ToArray();
+
+        Assert.Single(descriptors);
+        Assert.Null(descriptors[0].ServiceKey);
+        using var host = builder.Build();
+    }
+
     [Fact]
     public async Task Connectivity_failure_is_bounded_and_does_not_expose_endpoint_details()
     {
@@ -131,16 +168,21 @@ public sealed class MessagingRegistrationTests
                     TryTimeout = TimeSpan.FromMilliseconds(100)
                 }
             });
-        var healthCheck = new ServiceBusConnectivityHealthCheck(client);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var sender = client.CreateSender(
+            MessagingEntityNames.DocumentProcessingQueue);
+        var healthCheck = new ServiceBusConnectivityHealthCheck(
+            () => sender,
+            TimeSpan.FromSeconds(1),
+            new ServiceBusProbeTimer(TimeProvider.System));
 
         var result = await healthCheck.CheckHealthAsync(
             new HealthCheckContext(),
-            timeout.Token);
+            CancellationToken.None);
 
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
         Assert.DoesNotContain("127.0.0.1", result.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("SAS_KEY_VALUE", result.Description, StringComparison.Ordinal);
+        Assert.Null(result.Exception);
     }
 
     [Fact]
@@ -160,10 +202,16 @@ public sealed class MessagingRegistrationTests
 
     private static WebApplication BuildHost(IReadOnlyDictionary<string, string?> settings)
     {
+        return CreateBuilder(settings).Build();
+    }
+
+    private static WebApplicationBuilder CreateBuilder(
+        IReadOnlyDictionary<string, string?> settings)
+    {
         var builder = WebApplication.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(settings);
         builder.AddPlatformConfiguration();
-        builder.Services.AddPlatformIntegrationPublisher();
-        return builder.Build();
+        builder.AddPlatformIntegrationPublisher();
+        return builder;
     }
 }

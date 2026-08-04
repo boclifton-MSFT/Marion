@@ -36,6 +36,7 @@ var storage = builder.AddAzureStorage("storage")
         }
     });
 var messaging = builder.AddAzureServiceBus("messaging")
+    .ClearDefaultRoleAssignments()
     .RunAsEmulator(emulator =>
     {
         emulator.WithConfiguration(configuration =>
