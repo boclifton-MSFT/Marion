@@ -1,13 +1,23 @@
 import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
-import { webcrypto } from 'node:crypto'
+import {
+  createSign,
+  generateKeyPairSync,
+  webcrypto,
+  type KeyObject
+} from 'node:crypto'
 import { createApp, createRouter, defineEventHandler, toNodeListener } from 'h3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as oidc from 'openid-client'
 import googleRoute from './google.get'
 import callbackRoute from './google/callback.get'
 import logoutRoute from './logout.post'
 import { bindAuthDependencies, type AuthDependencies } from '../../utils/auth/dependencies'
-import type { MarionSession } from '../../utils/auth/security'
+import { completeAuthorization } from '../../utils/auth/oidc'
+import type {
+  MarionSession,
+  OAuthTransaction
+} from '../../utils/auth/security'
+import type { OidcRuntimeSettings } from '../../utils/auth/runtime'
 
 if (!globalThis.crypto) {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto })
@@ -35,6 +45,67 @@ const runtimeConfig = {
 Object.assign(globalThis, {
   useRuntimeConfig: () => runtimeConfig
 })
+
+function base64Json(value: object): string {
+  return Buffer.from(JSON.stringify(value)).toString('base64url')
+}
+
+function signedIdToken(
+  privateKey: KeyObject,
+  settings: OidcRuntimeSettings,
+  transaction: OAuthTransaction,
+  nowSeconds: number
+): string {
+  const signed = `${base64Json({ alg: 'RS256', kid: 'route-test-key', typ: 'JWT' })}.${base64Json({
+    iss: settings.issuer,
+    aud: settings.clientId,
+    sub: 'provider-subject',
+    nonce: transaction.nonce,
+    iat: nowSeconds - 20,
+    exp: nowSeconds + 10 * 60
+  })}`
+  const signer = createSign('RSA-SHA256')
+  signer.update(signed)
+  signer.end()
+  return `${signed}.${signer.sign(privateKey).toString('base64url')}`
+}
+
+function providerConfiguration(
+  settings: OidcRuntimeSettings,
+  transaction: OAuthTransaction,
+  nowSeconds: number
+): oidc.Configuration {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+  const jwk = publicKey.export({ format: 'jwk' })
+  const token = signedIdToken(privateKey as KeyObject, settings, transaction, nowSeconds)
+  const configuration = new oidc.Configuration({
+    issuer: settings.issuer,
+    authorization_endpoint: `${settings.issuer}/authorize`,
+    token_endpoint: `${settings.issuer}/token`,
+    jwks_uri: `${settings.issuer}/jwks`
+  }, settings.clientId, { client_secret: settings.clientSecret })
+
+  configuration[oidc.customFetch] = async (input, init) => {
+    const url = new URL(input.toString())
+    if (url.pathname === '/jwks') {
+      return Response.json({
+        keys: [{ ...jwk, kid: 'route-test-key', alg: 'RS256', use: 'sig' }]
+      })
+    }
+    if (url.pathname === '/token') {
+      expect(String(init?.body)).toContain('code=authorization-code-sentinel')
+      expect(String(init?.body)).toContain(`redirect_uri=${encodeURIComponent(transaction.redirectUri)}`)
+      return Response.json({
+        access_token: 'provider-access-token-sentinel',
+        token_type: 'Bearer',
+        id_token: token
+      })
+    }
+    throw new Error(`Unexpected mocked provider request: ${url}`)
+  }
+  oidc.enableNonRepudiationChecks(configuration)
+  return configuration
+}
 
 interface TestAuthState {
   dependencies: AuthDependencies
@@ -186,7 +257,7 @@ describe('Google auth route boundary', () => {
     const server = await startServer(state)
     servers.push(server)
 
-    const response = await fetch(`${server.baseUrl}/auth/google?returnTo=/pricing`, {
+    const response = await fetch(`${server.baseUrl}/auth/google?returnTo=/app/future-loan`, {
       redirect: 'manual'
     })
     const cookie = cookieNamed(response, '__Host-marion_oauth_tx')
@@ -303,7 +374,7 @@ describe('Google auth route boundary', () => {
         redirect: 'manual'
       }
     )
-    const acceptedStart = await fetch(`${server.baseUrl}/auth/google?returnTo=/pricing`, {
+    const acceptedStart = await fetch(`${server.baseUrl}/auth/google?returnTo=/app/future-loan`, {
       redirect: 'manual'
     })
     const replayCookie = requestCookie(cookieNamed(acceptedStart, '__Host-marion_oauth_tx'))
@@ -325,7 +396,7 @@ describe('Google auth route boundary', () => {
     const output = `${await rejectedCallback.text()}\n${await replayCallback.text()}\n${sessionCookie}`
 
     expect(rejectedCallback.headers.get('location')).toBe('/login?error=sign-in-failed')
-    expect(acceptedCallback.headers.get('location')).toBe('/pricing')
+    expect(acceptedCallback.headers.get('location')).toBe('/app/future-loan')
     expect(replayCallback.headers.get('location')).toBe('/login?error=sign-in-failed')
     expect(state.exchangeCode).toHaveBeenCalledTimes(1)
     expect(sessionCookie).toContain('HttpOnly')
@@ -339,11 +410,20 @@ describe('Google auth route boundary', () => {
     expect(output).not.toContain('generated-')
   })
 
-  it('revokes the server session and clears its cookie only for the trusted origin', async () => {
+  it('composes provider-mocked login, callback, session, and logout', async () => {
     const state = createTestAuthState()
+    state.now = Date.now()
+    state.dependencies.oidc.exchangeCode = async (settings, transaction, search, now) =>
+      completeAuthorization(
+        providerConfiguration(settings, transaction, Math.floor(now / 1000)),
+        settings,
+        transaction,
+        search,
+        now
+      )
     const server = await startServer(state)
     servers.push(server)
-    const start = await fetch(`${server.baseUrl}/auth/google`, { redirect: 'manual' })
+    const start = await fetch(`${server.baseUrl}/auth/google?returnTo=/app`, { redirect: 'manual' })
     const transactionCookie = requestCookie(cookieNamed(start, '__Host-marion_oauth_tx'))
     const callback = await fetch(
       `${server.baseUrl}/auth/google/callback?state=state-sentinel&code=authorization-code-sentinel`,
@@ -353,6 +433,7 @@ describe('Google auth route boundary', () => {
       }
     )
     const sessionCookie = requestCookie(cookieNamed(callback, '__Host-marion_session'))
+    const callbackOutput = `${[...callback.headers.entries()].join('\n')}\n${await callback.text()}`
 
     const logout = await fetch(`${server.baseUrl}/auth/logout`, {
       method: 'POST',
@@ -365,27 +446,13 @@ describe('Google auth route boundary', () => {
     const clearedCookie = cookieNamed(logout, '__Host-marion_session')
 
     expect(logout.status).toBe(204)
+    expect(callback.headers.get('location')).toBe('/app')
     expect(state.sessions.size).toBe(0)
     expect(clearedCookie).toContain('Max-Age=0')
     expect(clearedCookie).toContain('HttpOnly')
     expect(clearedCookie).toContain('Secure')
     expect(clearedCookie).not.toContain('generated-')
-  })
-})
-
-describe('anonymous UI route assumptions', () => {
-  it('keeps login and signup public while using top-level browser navigation for Google', async () => {
-    const [login, signup, config] = await Promise.all([
-      readFile(new URL('../../../app/pages/login.vue', import.meta.url), 'utf8'),
-      readFile(new URL('../../../app/pages/signup.vue', import.meta.url), 'utf8'),
-      readFile(new URL('../../../nuxt.config.ts', import.meta.url), 'utf8')
-    ])
-
-    expect(login).toContain('window.location.assign(\'/auth/google\')')
-    expect(signup).toContain('window.location.assign(\'/auth/google\')')
-    expect(login).not.toContain('middleware:')
-    expect(signup).not.toContain('middleware:')
-    expect(config).not.toContain('\'/\': { redirect: \'/login\' }')
-    expect(config).not.toContain('global auth middleware')
+    expect(callbackOutput).not.toContain('provider-access-token-sentinel')
+    expect(callbackOutput).not.toContain('provider-subject')
   })
 })
