@@ -213,6 +213,30 @@ public sealed class PlatformConfigurationTests
         }
     }
 
+    [Fact]
+    public void Azure_mode_rejects_Service_Bus_namespace_boundary_whitespace()
+    {
+        const string settingName =
+            "Marion:Platform:Azure:ServiceBusFullyQualifiedNamespace";
+        const string fullyQualifiedNamespace =
+            " messaging.servicebus.windows.net ";
+        var settings = CreateAzureSettings(
+            "https://documents.blob.core.windows.net");
+        settings[settingName] = fullyQualifiedNamespace;
+
+        var exception = ResolveOptions(settings);
+
+        Assert.Equal(
+            [
+                $"{settingName} must be a credential-free Service Bus fully qualified namespace host in Azure mode."
+            ],
+            exception.Failures);
+        Assert.DoesNotContain(
+            fullyQualifiedNamespace.Trim(),
+            exception.ToString(),
+            StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("messaging.servicebus.windows.net")]
     [InlineData("messaging.servicebus.usgovcloudapi.net")]

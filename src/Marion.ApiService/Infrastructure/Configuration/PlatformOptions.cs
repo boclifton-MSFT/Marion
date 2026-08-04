@@ -357,6 +357,7 @@ internal sealed class PlatformOptionsValidator : IValidateOptions<PlatformOption
     {
         var fullyQualifiedNamespace = value?.Trim();
         if (string.IsNullOrEmpty(fullyQualifiedNamespace)
+            || !string.Equals(value, fullyQualifiedNamespace, StringComparison.Ordinal)
             || fullyQualifiedNamespace.Any(char.IsWhiteSpace)
             || fullyQualifiedNamespace.IndexOfAny([';', '=', '/', '\\', '@', '?', '#']) >= 0
             || ServiceBusConnectionStringKeys.Contains(

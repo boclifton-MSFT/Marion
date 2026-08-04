@@ -94,7 +94,7 @@ Keep the `mariondb` logical connection name when replacing the local SQL resourc
 
 ### Authentication persistence
 
-Google sign-in uses the same shared `mariondb` database for server-only authorization transactions, sessions, and `(issuer, sub)` identity mappings. Aspire gives the Nuxt **server** a database reference and enables local schema provisioning; the browser receives neither the connection nor any provider credential.
+Google sign-in uses the same shared `mariondb` database for server-only authorization transactions, sessions, and `(issuer, sub)` identity mappings. In run mode, Aspire gives the Nuxt **server** a database reference and sets `NUXT_AUTH_STORE_PROVISION_SCHEMA=true` for local schema provisioning; the browser receives neither the connection nor any provider credential. Publish mode emits neither the local database reference nor the schema-provisioning flag.
 
 Production operators must supply `NUXT_AUTH_STORE_CONNECTION_STRING` through their deployment secret mechanism, provision the `MarionAuthTransactions`, `MarionAuthSessions`, and `MarionExternalIdentities` tables in a controlled one-time migration/provisioning run, then keep `NUXT_AUTH_STORE_PROVISION_SCHEMA` disabled on runtime replicas. Use a shared transactional SQL Server/Azure SQL database with a least-privilege principal. Process-local Nitro storage, local files, and per-replica SQLite are not supported because they cannot guarantee replay prevention, session revocation, or identity uniqueness across restarts and replicas.
 

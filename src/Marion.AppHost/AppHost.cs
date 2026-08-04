@@ -123,8 +123,7 @@ var frontend = integrationTesting
         .WithExternalHttpEndpoints()
         .WithReference(apiService)
         .WaitFor(apiService)
-        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"))
-        .WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true");
+        .WithEnvironment("NUXT_API_BASE", apiService.GetEndpoint("https"));
 
 if (builder.ExecutionContext.IsRunMode)
 {
@@ -140,7 +139,8 @@ if (builder.ExecutionContext.IsRunMode)
         .WaitFor(marionDb);
     if (frontend is not null)
     {
-        frontend.WithReference(marionDb)
+        frontend.WithEnvironment("NUXT_AUTH_STORE_PROVISION_SCHEMA", "true")
+            .WithReference(marionDb)
             .WaitFor(marionDb);
     }
 }

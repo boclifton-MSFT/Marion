@@ -93,6 +93,7 @@ public sealed class AppHostStorageModelTests
         Assert.Equal(
             "{mariondb.connectionString}",
             GetManifestExpression(frontendEnvironment, "ConnectionStrings__mariondb"));
+        Assert.Equal("true", frontendEnvironment["NUXT_AUTH_STORE_PROVISION_SCHEMA"]);
         Assert.DoesNotContain(
             resources,
             resource => resource.Name is "azure-sql-server" or "azure-sql-database");
@@ -193,6 +194,9 @@ public sealed class AppHostStorageModelTests
             DistributedApplicationOperation.Publish);
         Assert.DoesNotContain("ConnectionStrings__mariondb", allApiEnvironment);
         Assert.DoesNotContain("ConnectionStrings__mariondb", frontendEnvironment);
+        Assert.DoesNotContain(
+            "NUXT_AUTH_STORE_PROVISION_SCHEMA",
+            frontendEnvironment);
     }
 
     [Fact]
