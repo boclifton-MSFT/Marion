@@ -56,9 +56,9 @@ public sealed class StorageRegistrationTests
     }
 
     [Fact]
-    public void Azure_mode_uses_the_explicit_blob_endpoint_and_shared_token_credential()
+    public void Azure_mode_keeps_operational_blob_timeout_separate_from_readiness_timeout()
     {
-        using var factory = new MarionApiFactory("Testing").WithWebHostBuilder(builder =>
+        using var factory = new MarionApiFactory("Development").WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Marion:Platform:Mode", "Azure");
             builder.UseSetting(
@@ -89,6 +89,14 @@ public sealed class StorageRegistrationTests
             .GetRequiredService<BlobContainerClient>();
         var credential = scope.ServiceProvider
             .GetRequiredService<TokenCredential>();
+        var healthRegistration = Assert.Single(
+            scope.ServiceProvider
+                .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+                .Value
+                .Registrations,
+            registration => registration.Name == "documents");
+        var operationalOptions =
+            DocumentStorageServiceCollectionExtensions.CreateOperationalBlobClientOptions();
 
         Assert.Equal(
             "https://documents.blob.core.windows.net/documents",
@@ -97,5 +105,10 @@ public sealed class StorageRegistrationTests
         Assert.Same(
             credential,
             scope.ServiceProvider.GetRequiredService<DefaultAzureCredential>());
+        Assert.Equal(TimeSpan.FromSeconds(5), healthRegistration.Timeout);
+        Assert.Equal(
+            new BlobClientOptions().Retry.NetworkTimeout,
+            operationalOptions.Retry.NetworkTimeout);
+        Assert.NotEqual(healthRegistration.Timeout, operationalOptions.Retry.NetworkTimeout);
     }
 }

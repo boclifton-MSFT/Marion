@@ -85,13 +85,7 @@ internal static class DocumentStorageServiceCollectionExtensions
         AzurePlatformOptions options,
         TokenCredential credential)
     {
-        var clientOptions = new BlobClientOptions
-        {
-            Retry =
-            {
-                NetworkTimeout = ReadinessTimeout
-            }
-        };
+        var clientOptions = CreateOperationalBlobClientOptions();
 
         return new BlobServiceClient(
                 new Uri(options.BlobServiceUri!),
@@ -99,4 +93,7 @@ internal static class DocumentStorageServiceCollectionExtensions
                 clientOptions)
             .GetBlobContainerClient(options.BlobContainerName!);
     }
+
+    internal static BlobClientOptions CreateOperationalBlobClientOptions() =>
+        new();
 }
