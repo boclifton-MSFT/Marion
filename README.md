@@ -88,7 +88,7 @@ Azure mode authenticates only with `ManagedIdentityCredential` (system-assigned 
 
 The AppHost emits `Marion__Platform__Mode=Local` for `aspire start` and `IntegrationTesting`. Only run mode creates the local `sql`/`mariondb` resources and injects their connection-string references and wait relationships into the API and Nuxt server. When Aspire evaluates the publish model, it excludes that local SQL graph, emits `Azure`, supplies the Blob URI and Service Bus host from the existing Azure resource expressions, supplies the physical `documents` container name, and requires only the non-secret external `azure-sql-server` and `azure-sql-database` deployment parameters for SQL. Set those parameters through Aspire configuration or `Parameters__azure_sql_server` and `Parameters__azure_sql_database`; the model has no production defaults. This keeps emulator runs local while making every required published API setting explicit without adding a cloud compute environment or materializing a local SQL credential in production.
 
-Because no compute environment is configured, the current publish is infrastructure-only: it does not deploy the API or frontend workloads or prove or materialize their app settings, managed-identity attachment, RBAC assignment, or runtime connectivity.
+Because the AppHost has no cloud compute environment, `aspire publish` produces infrastructure-only artifacts. It does not deploy the API or frontend, materialize workload environment settings, attach a managed identity, assign application RBAC, or prove runtime connectivity.
 
 ### Future Azure SQL configuration
 
