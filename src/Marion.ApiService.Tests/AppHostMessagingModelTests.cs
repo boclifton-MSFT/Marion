@@ -3,7 +3,6 @@ extern alias AppHost;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
-using Azure.Provisioning.ServiceBus;
 using Xunit;
 using AppHostProjects = AppHost::Projects;
 
@@ -12,7 +11,7 @@ namespace Marion.ApiService.Tests;
 public sealed class AppHostMessagingModelTests
 {
     [Fact]
-    public async Task AppHost_models_the_Service_Bus_emulator_queue_topic_and_API_dependency()
+    public async Task AppHost_models_the_Service_Bus_emulator_and_API_dependency_without_RBAC_assignments()
     {
         var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
@@ -36,23 +35,12 @@ public sealed class AppHostMessagingModelTests
         Assert.Same(messaging, loanEvents.Parent);
         Assert.Equal("loan-events-subscription", loanEventsSubscription.SubscriptionName);
         Assert.Same(loanEvents, loanEventsSubscription.Parent);
-        var defaultServiceBusRoles = Assert.Single(
-            messaging.Annotations.OfType<DefaultRoleAssignmentsAnnotation>());
-        Assert.Equal(
-            ServiceBusBuiltInRole.GetBuiltInRoleName(
-                ServiceBusBuiltInRole.AzureServiceBusDataOwner),
-            Assert.Single(defaultServiceBusRoles.Roles).Name);
-        var serviceBusRoles = Assert.Single(
-            apiService.Annotations.OfType<RoleAssignmentAnnotation>(),
-            annotation => annotation.Target == messaging);
-        Assert.Equal(
-            ServiceBusBuiltInRole.GetBuiltInRoleName(
-                ServiceBusBuiltInRole.AzureServiceBusDataSender),
-            Assert.Single(serviceBusRoles.Roles).Name);
         Assert.DoesNotContain(
-            serviceBusRoles.Roles,
-            role => role.Name == ServiceBusBuiltInRole.GetBuiltInRoleName(
-                ServiceBusBuiltInRole.AzureServiceBusDataOwner));
+            messaging.Annotations,
+            annotation => annotation is DefaultRoleAssignmentsAnnotation);
+        Assert.DoesNotContain(
+            apiService.Annotations,
+            annotation => annotation is RoleAssignmentAnnotation);
         Assert.Contains(
             apiService.Annotations.OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == messaging
