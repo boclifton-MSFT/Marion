@@ -1,6 +1,5 @@
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using System.Collections.Concurrent;
 
 namespace Marion.ApiService.Infrastructure.Messaging;
 
@@ -23,51 +22,61 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
     private readonly Func<ServiceBusSender> senderFactory;
     private readonly TimeSpan probeTimeout;
     private readonly IServiceBusProbeTimer probeTimer;
-    private readonly ConcurrentDictionary<Task, byte> pendingCleanups = new();
+    private readonly Action<ServiceBusMessageBatch> batchDisposer;
+    private readonly SemaphoreSlim probeGate = new(1, 1);
+    private readonly object cleanupLock = new();
+    private Task? pendingCleanup;
 
     internal ServiceBusConnectivityHealthCheck(
         Func<ServiceBusSender> senderFactory,
         TimeSpan probeTimeout,
-        IServiceBusProbeTimer probeTimer)
+        IServiceBusProbeTimer probeTimer,
+        Action<ServiceBusMessageBatch>? batchDisposer = null)
     {
         this.senderFactory = senderFactory;
         this.probeTimeout = probeTimeout;
         this.probeTimer = probeTimer;
+        this.batchDisposer = batchDisposer ?? (static batch => batch.Dispose());
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        ServiceBusSender? sender = null;
-        Task<ServiceBusMessageBatch>? operation = null;
+        ThrowIfCallerCanceled(cancellationToken);
 
+        if (!probeGate.Wait(0))
+        {
+            ThrowIfCallerCanceled(cancellationToken);
+            return HealthCheckResult.Unhealthy(TimeoutDescription);
+        }
+
+        ServiceBusProbeLifecycle? lifecycle = null;
         try
         {
-            sender = senderFactory();
-            // The SDK's link-opening path can ignore this token, so the lifecycle races it
-            // against an independently owned budget and the caller's cancellation.
-            operation = sender.CreateMessageBatchAsync(CancellationToken.None).AsTask();
-        }
-        catch (Exception exception)
-        {
-            if (sender is null)
+            var sender = senderFactory();
+            Task<ServiceBusMessageBatch> operation;
+            try
             {
-                ThrowIfCallerCanceled(cancellationToken);
-                return SanitizeFailure(exception);
+                // The SDK's link-opening path can ignore this token, so the lifecycle races it
+                // against an independently owned budget and the caller's cancellation.
+                operation = sender.CreateMessageBatchAsync(CancellationToken.None).AsTask();
+            }
+            catch (Exception exception)
+            {
+                operation = Task.FromException<ServiceBusMessageBatch>(exception);
             }
 
-            operation = Task.FromException<ServiceBusMessageBatch>(exception);
-        }
-
-        var lifecycle = new ServiceBusProbeLifecycle(sender!, operation!);
-        try
-        {
+            lifecycle = new ServiceBusProbeLifecycle(
+                sender,
+                operation,
+                batchDisposer,
+                () => probeGate.Release());
             return await lifecycle.RunAsync(
                     probeTimeout,
                     probeTimer,
                     cancellationToken,
-                    StartCleanup)
+                    TrackCleanup)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -79,19 +88,28 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
             ThrowIfCallerCanceled(cancellationToken);
             return SanitizeFailure(exception);
         }
-
-        void StartCleanup(Task cleanupTask)
+        finally
         {
-            pendingCleanups.TryAdd(cleanupTask, 0);
+            if (lifecycle is null)
+            {
+                probeGate.Release();
+            }
+        }
+
+        void TrackCleanup(Task cleanupTask)
+        {
+            lock (cleanupLock)
+            {
+                pendingCleanup = cleanupTask;
+            }
+
+            // Cleanup is designed to return a result rather than fault, but keep a final
+            // observation hook for unexpected implementation or SDK failures.
             _ = cleanupTask.ContinueWith(
-                static (completedTask, state) =>
-                {
-                    var owner = (ServiceBusConnectivityHealthCheck)state!;
-                    owner.pendingCleanups.TryRemove(completedTask, out _);
-                },
-                this,
+                static completedTask => _ = completedTask.Exception,
                 CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
+                TaskContinuationOptions.OnlyOnFaulted
+                    | TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
         }
 
@@ -109,25 +127,26 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
 
     internal async Task WaitForPendingCleanupAsync()
     {
-        while (true)
+        Task? cleanup;
+        lock (cleanupLock)
         {
-            var cleanups = pendingCleanups.Keys.ToArray();
-            if (cleanups.Length == 0)
-            {
-                return;
-            }
+            cleanup = pendingCleanup;
+        }
 
-            await Task.WhenAll(cleanups).ConfigureAwait(false);
+        if (cleanup is not null)
+        {
+            await cleanup.ConfigureAwait(false);
         }
     }
 
     private sealed class ServiceBusProbeLifecycle(
         ServiceBusSender sender,
-        Task<ServiceBusMessageBatch> operation)
+        Task<ServiceBusMessageBatch> operation,
+        Action<ServiceBusMessageBatch> batchDisposer,
+        Action releaseProbeSlot)
     {
-        private readonly object disposalLock = new();
-        private Task<Exception?>? disposalTask;
-        private Task? cleanupTask;
+        private readonly object cleanupLock = new();
+        private Task<ProbeCleanupResult>? cleanupTask;
 
         public async Task<HealthCheckResult> RunAsync(
             TimeSpan timeout,
@@ -138,35 +157,51 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
             using var timeoutCancellation = new CancellationTokenSource();
             var timeoutTask = timer.DelayAsync(timeout, timeoutCancellation.Token);
             var callerCancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, callerToken);
-            var winner = await Task.WhenAny(
-                    operation,
-                    timeoutTask,
-                    callerCancellationTask)
-                .ConfigureAwait(false);
 
             try
             {
+                var winner = await Task.WhenAny(
+                        operation,
+                        timeoutTask,
+                        callerCancellationTask)
+                    .ConfigureAwait(false);
+
                 if (callerToken.IsCancellationRequested)
                 {
-                    startCleanup(StartCleanup());
+                    _ = StartCleanup(startCleanup);
                     throw new OperationCanceledException(callerToken);
                 }
 
                 if (ReferenceEquals(winner, operation))
                 {
-                    return await CompleteOperationAsync(callerToken).ConfigureAwait(false);
+                    return await CompleteOperationAsync(
+                            timeoutTask,
+                            callerToken,
+                            startCleanup)
+                        .ConfigureAwait(false);
                 }
 
                 if (ReferenceEquals(winner, timeoutTask))
                 {
                     await timeoutTask.ConfigureAwait(false);
-                    startCleanup(StartCleanup());
+                    _ = StartCleanup(startCleanup);
                     callerToken.ThrowIfCancellationRequested();
                     return HealthCheckResult.Unhealthy(TimeoutDescription);
                 }
 
-                startCleanup(StartCleanup());
+                _ = StartCleanup(startCleanup);
                 throw new OperationCanceledException(callerToken);
+            }
+            catch (OperationCanceledException) when (callerToken.IsCancellationRequested)
+            {
+                _ = StartCleanup(startCleanup);
+                throw new OperationCanceledException(callerToken);
+            }
+            catch (Exception)
+            {
+                _ = StartCleanup(startCleanup);
+                callerToken.ThrowIfCancellationRequested();
+                return HealthCheckResult.Unhealthy(UnavailableDescription);
             }
             finally
             {
@@ -175,69 +210,101 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
         }
 
         private async Task<HealthCheckResult> CompleteOperationAsync(
-            CancellationToken callerToken)
+            Task timeoutTask,
+            CancellationToken callerToken,
+            Action<Task> startCleanup)
         {
-            ServiceBusMessageBatch? batch = null;
-            Exception? failure = null;
+            var cleanup = StartCleanup(startCleanup);
+            var callerCancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, callerToken);
+            var winner = await Task.WhenAny(
+                    cleanup,
+                    timeoutTask,
+                    callerCancellationTask)
+                .ConfigureAwait(false);
 
+            if (callerToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(callerToken);
+            }
+
+            if (ReferenceEquals(winner, timeoutTask))
+            {
+                await timeoutTask.ConfigureAwait(false);
+                callerToken.ThrowIfCancellationRequested();
+                return HealthCheckResult.Unhealthy(TimeoutDescription);
+            }
+
+            if (!ReferenceEquals(winner, cleanup))
+            {
+                throw new OperationCanceledException(callerToken);
+            }
+
+            var cleanupResult = await cleanup.ConfigureAwait(false);
+            callerToken.ThrowIfCancellationRequested();
+            return cleanupResult.ToHealthCheckResult();
+        }
+
+        private Task<ProbeCleanupResult> StartCleanup(Action<Task> startCleanup)
+        {
+            lock (cleanupLock)
+            {
+                if (cleanupTask is not null)
+                {
+                    return cleanupTask;
+                }
+
+                cleanupTask = CleanupAsync();
+                startCleanup(cleanupTask);
+                return cleanupTask;
+            }
+        }
+
+        private async Task<ProbeCleanupResult> CleanupAsync()
+        {
             try
             {
-                batch = await operation.ConfigureAwait(false);
+                // Start both operations before awaiting either one. A stalled sender close
+                // must not prevent observation and disposal of a late-created batch.
+                var operationCleanup = ObserveOperationAndDisposeBatchAsync();
+                var senderCleanup = DisposeSenderAsync();
+                var failures = await Task.WhenAll(operationCleanup, senderCleanup)
+                    .ConfigureAwait(false);
+                return new(failures[0], failures[1]);
             }
             catch (Exception exception)
             {
-                failure = exception;
+                return new(exception, null);
             }
-
-            if (batch is not null)
+            finally
             {
-                try
-                {
-                    batch.Dispose();
-                }
-                catch (Exception exception)
-                {
-                    failure ??= exception;
-                }
-            }
-
-            var disposalFailure = await DisposeSenderOnceAsync().ConfigureAwait(false);
-            failure ??= disposalFailure;
-            callerToken.ThrowIfCancellationRequested();
-
-            return failure is null
-                ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy(UnavailableDescription);
-        }
-
-        private Task StartCleanup()
-        {
-            lock (disposalLock)
-            {
-                return cleanupTask ??= CleanupLateOperationAsync();
+                releaseProbeSlot();
             }
         }
 
-        private async Task CleanupLateOperationAsync()
+        private async Task<Exception?> ObserveOperationAndDisposeBatchAsync()
         {
-            // Dispose the probe sender promptly, then observe the SDK task and any late batch.
-            _ = await DisposeSenderOnceAsync().ConfigureAwait(false);
             try
             {
                 var batch = await operation.ConfigureAwait(false);
-                batch?.Dispose();
-            }
-            catch (Exception)
-            {
-                // The health result has already returned; this await exists to observe late SDK failures.
-            }
-        }
+                if (batch is null)
+                {
+                    return null;
+                }
 
-        private Task<Exception?> DisposeSenderOnceAsync()
-        {
-            lock (disposalLock)
+                try
+                {
+                    batchDisposer(batch);
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+            catch (Exception exception)
             {
-                return disposalTask ??= DisposeSenderAsync();
+                // Awaiting the operation here observes both late success and late failure.
+                return exception;
             }
         }
 
@@ -252,6 +319,16 @@ internal sealed class ServiceBusConnectivityHealthCheck : IHealthCheck
             {
                 return exception;
             }
+        }
+
+        private sealed record ProbeCleanupResult(
+            Exception? OperationFailure,
+            Exception? SenderFailure)
+        {
+            public HealthCheckResult ToHealthCheckResult() =>
+                OperationFailure is null && SenderFailure is null
+                    ? HealthCheckResult.Healthy()
+                    : HealthCheckResult.Unhealthy(UnavailableDescription);
         }
     }
 }

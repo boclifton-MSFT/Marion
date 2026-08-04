@@ -31,6 +31,36 @@ public sealed class ServiceBusConnectivityHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealth_disposes_a_completed_batch_exactly_once()
+    {
+        var batch = ServiceBusModelFactory.ServiceBusMessageBatch(
+            1024,
+            [],
+            new CreateMessageBatchOptions(),
+            _ => true);
+        var batchDisposeCount = 0;
+        var sender = new RecordingServiceBusSender(
+            _ => ValueTask.FromResult(batch));
+        var healthCheck = new ServiceBusConnectivityHealthCheck(
+            () => sender,
+            TimeSpan.FromSeconds(1),
+            new ManualProbeTimer(releaseImmediately: true),
+            disposedBatch =>
+            {
+                batchDisposeCount++;
+                disposedBatch.Dispose();
+            });
+
+        var result = await healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+
+        Assert.Equal(HealthStatus.Healthy, result.Status);
+        Assert.Equal(1, batchDisposeCount);
+        Assert.Equal(1, sender.DisposeCount);
+    }
+
+    [Fact]
     public async Task CheckHealth_disposes_the_sender_when_batch_creation_fails_synchronously()
     {
         var sender = new RecordingServiceBusSender(
@@ -132,6 +162,72 @@ public sealed class ServiceBusConnectivityHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealth_bounds_sender_disposal_and_releases_it_only_after_cleanup_finishes()
+    {
+        var stalledDisposal = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = new RecordingServiceBusSender(
+            _ => ValueTask.FromResult<ServiceBusMessageBatch>(null!),
+            () => new ValueTask(stalledDisposal.Task));
+        var timer = new ManualProbeTimer();
+        var healthCheck = CreateHealthCheck(() => sender, timer);
+
+        var checkTask = healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+        await sender.DisposeStarted.Task;
+        timer.Release();
+
+        var result = await checkTask;
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("Service Bus connectivity check timed out.", result.Description);
+        Assert.Equal(1, sender.DisposeCount);
+        Assert.True(sender.OperationSettled.Task.IsCompleted);
+
+        stalledDisposal.SetResult(null);
+        await healthCheck.WaitForPendingCleanupAsync();
+        Assert.Equal(1, sender.DisposeCount);
+    }
+
+    [Fact]
+    public async Task CheckHealth_observes_late_failure_while_sender_disposal_is_stalled()
+    {
+        var lateOperation = new TaskCompletionSource<ServiceBusMessageBatch>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var stalledDisposal = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = new RecordingServiceBusSender(
+            _ => new ValueTask<ServiceBusMessageBatch>(lateOperation.Task),
+            () => new ValueTask(stalledDisposal.Task));
+        var timer = new ManualProbeTimer();
+        var healthCheck = CreateHealthCheck(() => sender, timer);
+
+        var checkTask = healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+        await sender.BatchStarted.Task;
+        timer.Release();
+        await sender.DisposeStarted.Task;
+
+        var result = await checkTask;
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("Service Bus connectivity check timed out.", result.Description);
+        Assert.Equal(1, sender.DisposeCount);
+
+        lateOperation.SetException(new ServiceBusException(
+            "late tenant endpoint amqp details",
+            ServiceBusFailureReason.GeneralError,
+            "document-processing",
+            null));
+        await sender.OperationSettled.Task;
+
+        stalledDisposal.SetResult(null);
+        await healthCheck.WaitForPendingCleanupAsync();
+    }
+
+    [Fact]
     public async Task CheckHealth_caller_cancellation_wins_and_preserves_the_caller_token()
     {
         var lateOperation = new TaskCompletionSource<ServiceBusMessageBatch>(
@@ -152,6 +248,78 @@ public sealed class ServiceBusConnectivityHealthCheckTests
             () => checkTask);
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, sender.DisposeCount);
+
+        lateOperation.SetResult(null!);
+        await healthCheck.WaitForPendingCleanupAsync();
+    }
+
+    [Fact]
+    public async Task CheckHealth_caller_cancellation_during_cleanup_preserves_the_caller_token()
+    {
+        var stalledDisposal = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = new RecordingServiceBusSender(
+            _ => ValueTask.FromResult<ServiceBusMessageBatch>(null!),
+            () => new ValueTask(stalledDisposal.Task));
+        var healthCheck = CreateHealthCheck(() => sender, new ManualProbeTimer());
+        using var cancellation = new CancellationTokenSource();
+
+        var checkTask = healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            cancellation.Token);
+        await sender.DisposeStarted.Task;
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => checkTask);
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, sender.DisposeCount);
+
+        stalledDisposal.SetResult(null);
+        await healthCheck.WaitForPendingCleanupAsync();
+    }
+
+    [Fact]
+    public async Task CheckHealth_allows_only_one_stuck_lifecycle_across_repeated_probes()
+    {
+        var lateOperation = new TaskCompletionSource<ServiceBusMessageBatch>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = new RecordingServiceBusSender(
+            _ => new ValueTask<ServiceBusMessageBatch>(lateOperation.Task));
+        var senderFactoryCount = 0;
+        var timer = new ManualProbeTimer();
+        var healthCheck = CreateHealthCheck(
+            () =>
+            {
+                Interlocked.Increment(ref senderFactoryCount);
+                return sender;
+            },
+            timer);
+
+        var firstCheck = healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+        await sender.BatchStarted.Task;
+        timer.Release();
+        var firstResult = await firstCheck;
+
+        var repeatedResults = await Task.WhenAll(
+            Enumerable.Range(0, 16)
+                .Select(_ => healthCheck.CheckHealthAsync(
+                    new HealthCheckContext(),
+                    CancellationToken.None)));
+
+        Assert.Equal(HealthStatus.Unhealthy, firstResult.Status);
+        Assert.All(
+            repeatedResults,
+            result =>
+            {
+                Assert.Equal(HealthStatus.Unhealthy, result.Status);
+                Assert.Equal("Service Bus connectivity check timed out.", result.Description);
+            });
+        Assert.Equal(1, senderFactoryCount);
         Assert.Equal(1, sender.DisposeCount);
 
         lateOperation.SetResult(null!);
@@ -247,18 +415,20 @@ public sealed class ServiceBusConnectivityHealthCheckTests
     private sealed class RecordingServiceBusSender : ServiceBusSender
     {
         private readonly Func<CancellationToken, ValueTask<ServiceBusMessageBatch>> operation;
+        private readonly Func<ValueTask> disposeOperation;
 
         public RecordingServiceBusSender(Exception? failure = null)
             : this(_ => failure is null
                 ? ValueTask.FromResult<ServiceBusMessageBatch>(null!)
-                : ValueTask.FromException<ServiceBusMessageBatch>(failure))
+                : ValueTask.FromException<ServiceBusMessageBatch>(failure),
+                null)
         {
         }
 
         public RecordingServiceBusSender(
             Exception failure,
             bool throwSynchronously)
-            : this(_ => ValueTask.FromException<ServiceBusMessageBatch>(failure))
+            : this(_ => ValueTask.FromException<ServiceBusMessageBatch>(failure), null)
         {
             if (throwSynchronously)
             {
@@ -267,9 +437,11 @@ public sealed class ServiceBusConnectivityHealthCheckTests
         }
 
         public RecordingServiceBusSender(
-            Func<CancellationToken, ValueTask<ServiceBusMessageBatch>> operation)
+            Func<CancellationToken, ValueTask<ServiceBusMessageBatch>> operation,
+            Func<ValueTask>? disposeOperation = null)
         {
             this.operation = operation;
+            this.disposeOperation = disposeOperation ?? (() => ValueTask.CompletedTask);
         }
 
         private Exception? synchronousFailure;
@@ -292,6 +464,9 @@ public sealed class ServiceBusConnectivityHealthCheckTests
         public TaskCompletionSource<object?> OperationSettled { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource<object?> DisposeStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public override ValueTask<ServiceBusMessageBatch> CreateMessageBatchAsync(
             CancellationToken cancellationToken = default)
         {
@@ -309,7 +484,8 @@ public sealed class ServiceBusConnectivityHealthCheckTests
         public override ValueTask DisposeAsync()
         {
             DisposeCount++;
-            return ValueTask.CompletedTask;
+            DisposeStarted.TrySetResult(null);
+            return disposeOperation();
         }
 
         public override Task SendMessageAsync(
