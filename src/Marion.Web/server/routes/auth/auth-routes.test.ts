@@ -40,6 +40,8 @@ interface TestAuthState {
   dependencies: AuthDependencies
   authorizationUrl: ReturnType<typeof vi.fn>
   exchangeCode: ReturnType<typeof vi.fn>
+  resolveIdentity: ReturnType<typeof vi.fn>
+  rotateSession: ReturnType<typeof vi.fn>
   telemetry: string[]
   sessions: Map<string, MarionSession>
   now: number
@@ -56,12 +58,21 @@ function createTestAuthState(): TestAuthState {
     issuer: 'https://accounts.google.com',
     subject: 'provider-subject'
   }))
+  const resolveIdentity = vi.fn(async () => 'marion-user')
+  const rotateSession = vi.fn(async (previousSessionId: string | undefined, session: MarionSession) => {
+    if (previousSessionId) {
+      sessions.delete(previousSessionId)
+    }
+    sessions.set(session.sessionId, session)
+  })
   let generatedId = 0
   const now = 1_750_000_000_000
 
   const state: TestAuthState = {
     authorizationUrl,
     exchangeCode,
+    resolveIdentity,
+    rotateSession,
     telemetry,
     sessions,
     now,
@@ -106,18 +117,13 @@ function createTestAuthState(): TestAuthState {
           sessions.set(active.sessionId, active)
           return active
         },
-        rotate: async (previousSessionId, session) => {
-          if (previousSessionId) {
-            sessions.delete(previousSessionId)
-          }
-          sessions.set(session.sessionId, session)
-        },
+        rotate: rotateSession,
         revoke: async (sessionId) => {
           sessions.delete(sessionId)
         }
       },
       identities: {
-        resolve: async () => 'marion-user'
+        resolve: resolveIdentity
       }
     }
   }
@@ -337,6 +343,45 @@ describe('Google auth route boundary', () => {
     expect(output).not.toContain('client-secret-sentinel')
     expect(output).not.toContain('provider-subject')
     expect(output).not.toContain('generated-')
+  })
+
+  it.each([
+    [
+      'network failure',
+      ['network-exception-sentinel', 'access-token-sentinel']
+    ],
+    [
+      'token exchange failure',
+      ['token-exchange-exception-sentinel', 'id-token-sentinel', 'raw-claim-sentinel']
+    ]
+  ])('sanitizes a sensitive %s without creating an identity or session', async (_, sensitiveValues) => {
+    const state = createTestAuthState()
+    state.exchangeCode.mockRejectedValueOnce(new Error(sensitiveValues.join('|')))
+    const server = await startServer(state)
+    servers.push(server)
+    const start = await fetch(`${server.baseUrl}/auth/google`, { redirect: 'manual' })
+    const transactionCookie = requestCookie(cookieNamed(start, '__Host-marion_oauth_tx'))
+
+    const callback = await fetch(
+      `${server.baseUrl}/auth/google/callback?state=state-sentinel&code=authorization-code-sentinel`,
+      {
+        headers: { cookie: transactionCookie },
+        redirect: 'manual'
+      }
+    )
+    const output = `${[...callback.headers.entries()].join('\n')}\n${await callback.text()}`
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toBe('/login?error=sign-in-failed')
+    expect(state.telemetry).toEqual(['callback-failed'])
+    expect(state.resolveIdentity).not.toHaveBeenCalled()
+    expect(state.rotateSession).not.toHaveBeenCalled()
+    expect(state.sessions.size).toBe(0)
+    expect(output).not.toContain('authorization-code-sentinel')
+    expect(output).not.toContain('provider-subject')
+    for (const sensitiveValue of sensitiveValues) {
+      expect(output).not.toContain(sensitiveValue)
+    }
   })
 
   it('revokes the server session and clears its cookie only for the trusted origin', async () => {
