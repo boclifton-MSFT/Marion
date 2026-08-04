@@ -8,7 +8,7 @@ import {
 import {
   createOAuthTransaction,
   OAUTH_TRANSACTION_MAX_AGE_SECONDS,
-  safeReturnTo
+  safeProtectedReturnTo
 } from '../../utils/auth/security'
 import { saveTransactionInCookie } from '../../utils/auth/session'
 
@@ -23,12 +23,12 @@ export default defineEventHandler(async (event) => {
       return sendRedirect(event, SIGN_IN_UNAVAILABLE)
     }
 
-    const returnTo = safeReturnTo(getQuery(event).returnTo)
+    const returnTo = safeProtectedReturnTo(getQuery(event).returnTo)
     const transaction = createOAuthTransaction({
       state: dependencies.random.state(),
       nonce: dependencies.random.nonce(),
       codeVerifier: dependencies.random.pkceVerifier()
-    }, dependencies.random.uuid(), returnTo, dependencies.clock.now())
+    }, dependencies.random.uuid(), settings.redirectUri, returnTo, dependencies.clock.now())
 
     if (!await saveTransactionInCookie(event, transaction)) {
       return sendRedirect(event, SIGN_IN_UNAVAILABLE)

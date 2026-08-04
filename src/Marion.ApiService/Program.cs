@@ -1,4 +1,5 @@
 using Marion.ApiService.Features.System;
+using Marion.ApiService.Infrastructure.Configuration;
 using Marion.ApiService.Infrastructure.Messaging;
 using Marion.ApiService.Infrastructure.Persistence;
 using Marion.ApiService.Infrastructure.Storage;
@@ -8,8 +9,28 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 var integrationTesting = builder.Environment.IsEnvironment("IntegrationTesting");
+var platformMode = PlatformConfigurationExtensions.ParseMode(
+    builder.Configuration[PlatformOptions.SectionName + ":Mode"]);
 
-builder.AddAzureKeyVaultClient(connectionName: "marionkv");
+builder.AddPlatformConfiguration();
+if (!integrationTesting)
+{
+    builder.AddAzureKeyVaultClient(
+        connectionName: "marionkv",
+        settings =>
+        {
+            settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
+        },
+        clientBuilder =>
+        {
+            if (platformMode == PlatformMode.Azure)
+            {
+                clientBuilder.WithCredential(
+                    serviceProvider =>
+                        serviceProvider.GetRequiredService<Azure.Core.TokenCredential>());
+            }
+        });
+}
 
 if (integrationTesting)
 {
@@ -25,13 +46,12 @@ if (integrationTesting)
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.AddSqlServerDbContext<MarionDbContext>(
-    "mariondb",
+builder.AddMarionPersistence(
     settings =>
     {
         settings.DisableHealthChecks = builder.Environment.IsEnvironment("Testing");
         settings.DisableRetry = integrationTesting;
-        settings.CommandTimeout = integrationTesting ? 3 : null;
+        settings.CommandTimeoutSeconds = integrationTesting ? 3 : null;
     });
 builder.AddAzureBlobContainerClient(
     "documents",
@@ -52,16 +72,7 @@ builder.AddAzureBlobContainerClient(
     });
 builder.Services.AddDocumentStorage(
     disableHealthChecks: builder.Environment.IsEnvironment("Testing"));
-builder.AddAzureServiceBusClient(
-    "messaging",
-    settings =>
-    {
-        if (!builder.Environment.IsEnvironment("Testing"))
-        {
-            settings.HealthCheckQueueName = MessagingEntityNames.DocumentProcessingQueue;
-        }
-    });
-builder.Services.AddPlatformIntegrationPublisher();
+builder.AddPlatformIntegrationPublisher();
 
 if (integrationTesting)
 {

@@ -1,7 +1,18 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { SessionConfig } from 'h3'
+import {
+  DEFAULT_RETURN_TO,
+  isProtectedPath,
+  safeProtectedReturnTo,
+  safeReturnTo
+} from '../../../shared/auth/return-to'
 
-export const DEFAULT_RETURN_TO = '/'
+export {
+  DEFAULT_RETURN_TO,
+  isProtectedPath,
+  safeProtectedReturnTo,
+  safeReturnTo
+}
 export const ID_TOKEN_CLOCK_SKEW_SECONDS = 60
 export const ID_TOKEN_MAX_AGE_SECONDS = 10 * 60
 export const OAUTH_TRANSACTION_MAX_AGE_SECONDS = 5 * 60
@@ -15,6 +26,7 @@ export interface OAuthTransaction {
   state: string
   nonce: string
   codeVerifier: string
+  redirectUri: string
   returnTo: string
   issuedAt: number
 }
@@ -57,35 +69,10 @@ function isTimestamp(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
-export function safeReturnTo(value: unknown): string {
-  if (!isNonEmptyString(value) || !value.startsWith('/') || value.startsWith('//')) {
-    return DEFAULT_RETURN_TO
-  }
-
-  let decoded: string
-  try {
-    decoded = decodeURIComponent(value)
-  } catch {
-    return DEFAULT_RETURN_TO
-  }
-
-  if (value.includes('\\') || decoded.includes('\\') || decoded.startsWith('//')) {
-    return DEFAULT_RETURN_TO
-  }
-
-  try {
-    const target = new URL(value, 'https://marion.invalid')
-    return target.origin === 'https://marion.invalid'
-      ? `${target.pathname}${target.search}${target.hash}`
-      : DEFAULT_RETURN_TO
-  } catch {
-    return DEFAULT_RETURN_TO
-  }
-}
-
 export function createOAuthTransaction(
   values: Pick<OAuthTransaction, 'state' | 'nonce' | 'codeVerifier'>,
   transactionId: string,
+  redirectUri: string,
   returnTo: string,
   now: number
 ): OAuthTransaction {
@@ -94,6 +81,7 @@ export function createOAuthTransaction(
     state: values.state,
     nonce: values.nonce,
     codeVerifier: values.codeVerifier,
+    redirectUri,
     returnTo: safeReturnTo(returnTo),
     issuedAt: now
   }
@@ -109,11 +97,28 @@ export function isCurrentOAuthTransaction(value: unknown, now: number): value is
     && isNonEmptyString(transaction.state)
     && isNonEmptyString(transaction.nonce)
     && isNonEmptyString(transaction.codeVerifier)
+    && isValidRedirectUri(transaction.redirectUri)
     && isNonEmptyString(transaction.returnTo)
     && isTimestamp(transaction.issuedAt)
     && transaction.issuedAt <= now
     && now - transaction.issuedAt <= OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000
     && safeReturnTo(transaction.returnTo) === transaction.returnTo
+}
+
+function isValidRedirectUri(value: unknown): value is string {
+  if (!isNonEmptyString(value)) {
+    return false
+  }
+
+  try {
+    const redirectUri = new URL(value)
+    return redirectUri.protocol === 'https:'
+      && redirectUri.pathname === '/auth/google/callback'
+      && !redirectUri.search
+      && !redirectUri.hash
+  } catch {
+    return false
+  }
 }
 
 export function createMarionSession(userId: string, sessionId: string, now: number): MarionSession {

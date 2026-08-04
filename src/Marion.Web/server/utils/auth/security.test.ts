@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculatePKCECodeChallenge } from 'openid-client'
+import { googleSignInPath } from '../../../shared/auth/return-to'
 import {
   DEFAULT_RETURN_TO,
   ID_TOKEN_MAX_AGE_SECONDS,
@@ -11,6 +12,7 @@ import {
   createMarionSession,
   createOAuthTransaction,
   isCurrentOAuthTransaction,
+  safeProtectedReturnTo,
   safeReturnTo,
   sessionCookieConfig,
   sessionIsActive,
@@ -41,17 +43,33 @@ describe('OIDC transaction security', () => {
       state: random.state(),
       nonce: random.nonce(),
       codeVerifier: random.pkceVerifier()
-    }, random.uuid(), '/pricing?source=google', now)
+    }, random.uuid(), 'https://localhost:7257/auth/google/callback', '/pricing?source=google', now)
 
     expect(transaction).toMatchObject({
       state: 'state',
       nonce: 'nonce',
       codeVerifier: 'verifier',
+      redirectUri: 'https://localhost:7257/auth/google/callback',
       returnTo: '/pricing?source=google',
       issuedAt: now
     })
     expect(isCurrentOAuthTransaction(transaction, now + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000)).toBe(true)
     expect(isCurrentOAuthTransaction(transaction, now + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000 + 1)).toBe(false)
+  })
+
+  it.each([
+    'http://localhost:7257/auth/google/callback',
+    'https://localhost:7257/auth/not-google',
+    'https://localhost:7257/auth/google/callback?returnTo=/',
+    'https://localhost:7257/auth/google/callback#fragment'
+  ])('rejects a transaction with an invalid redirect URI: %s', (redirectUri) => {
+    const transaction = createOAuthTransaction({
+      state: 'state',
+      nonce: 'nonce',
+      codeVerifier: 'verifier'
+    }, 'transaction-id', redirectUri, '/', 1_750_000_000_000)
+
+    expect(isCurrentOAuthTransaction(transaction, 1_750_000_000_000)).toBe(false)
   })
 
   it.each([
@@ -63,6 +81,31 @@ describe('OIDC transaction security', () => {
     ['/docs/getting-started?section=oidc', '/docs/getting-started?section=oidc']
   ])('only accepts local return paths: %s', (value, expected) => {
     expect(safeReturnTo(value)).toBe(expected)
+  })
+
+  it.each([
+    ['/app', '/app'],
+    ['/app/loans/123?tab=details', '/app/loans/123?tab=details'],
+    ['/app-like', DEFAULT_RETURN_TO],
+    ['/pricing', DEFAULT_RETURN_TO],
+    ['https://attacker.example/app', DEFAULT_RETURN_TO],
+    ['//attacker.example/app', DEFAULT_RETURN_TO],
+    ['/app\\attacker.example', DEFAULT_RETURN_TO]
+  ])('only preserves protected application return targets: %s', (value, expected) => {
+    expect(safeProtectedReturnTo(value)).toBe(expected)
+  })
+
+  it.each([
+    ['/app', '/auth/google?returnTo=%2Fapp'],
+    [
+      '/app/loans/123?tab=details',
+      '/auth/google?returnTo=%2Fapp%2Floans%2F123%3Ftab%3Ddetails'
+    ],
+    ['/pricing', '/auth/google'],
+    ['https://attacker.example/app', '/auth/google'],
+    [undefined, '/auth/google']
+  ])('builds a safe Google sign-in path for return target %s', (value, expected) => {
+    expect(googleSignInPath(value)).toBe(expected)
   })
 })
 

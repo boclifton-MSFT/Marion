@@ -8,26 +8,36 @@ using AppHostProjects = AppHost::Projects;
 
 namespace Marion.ApiService.Tests;
 
+[Collection(AppHostTestCollection.Name)]
 public sealed class AppHostMessagingModelTests
 {
     [Fact]
-    public async Task AppHost_models_the_Service_Bus_emulator_queue_topic_and_API_dependency()
+    public async Task AppHost_models_the_Service_Bus_emulator_and_API_dependency_without_RBAC_assignments()
     {
-        var builder =
+        await using var builder =
             await DistributedApplicationTestingBuilder.CreateAsync<AppHostProjects.Marion_AppHost>();
 
+        var resources = builder.Resources.ToArray();
+        var annotations = resources.ToDictionary(
+            resource => resource,
+            resource => resource.Annotations.ToArray());
+
+        {
+            await using var app = await builder.BuildAsync();
+        }
+
         var messaging = Assert.IsType<AzureServiceBusResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "messaging"));
+            Assert.Single(resources, resource => resource.Name == "messaging"));
         var documentProcessing = Assert.IsType<AzureServiceBusQueueResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "document-processing"));
+            Assert.Single(resources, resource => resource.Name == "document-processing"));
         var loanEvents = Assert.IsType<AzureServiceBusTopicResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "loan-events"));
+            Assert.Single(resources, resource => resource.Name == "loan-events"));
         var loanEventsSubscription = Assert.IsType<AzureServiceBusSubscriptionResource>(
             Assert.Single(
-                builder.Resources,
+                resources,
                 resource => resource.Name == "loan-events-subscription"));
         var apiService = Assert.Single(
-            builder.Resources,
+            resources,
             resource => resource.Name == "apiservice");
 
         Assert.True(messaging.IsEmulator);
@@ -35,12 +45,18 @@ public sealed class AppHostMessagingModelTests
         Assert.Same(messaging, loanEvents.Parent);
         Assert.Equal("loan-events-subscription", loanEventsSubscription.SubscriptionName);
         Assert.Same(loanEvents, loanEventsSubscription.Parent);
+        Assert.DoesNotContain(
+            annotations[messaging],
+            annotation => annotation is DefaultRoleAssignmentsAnnotation);
+        Assert.DoesNotContain(
+            annotations[apiService],
+            annotation => annotation is RoleAssignmentAnnotation);
         Assert.Contains(
-            apiService.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            annotations[apiService].OfType<ResourceRelationshipAnnotation>(),
             annotation => annotation.Resource == messaging
                 && annotation.Type == "Reference");
         Assert.Contains(
-            apiService.Annotations.OfType<WaitAnnotation>(),
+            annotations[apiService].OfType<WaitAnnotation>(),
             annotation => annotation.Resource == messaging);
     }
 }

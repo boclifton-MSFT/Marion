@@ -1,5 +1,10 @@
+using Azure.Core;
+using Azure.Identity;
 using Azure.Messaging.ServiceBus;
+using Marion.ApiService.Infrastructure.Configuration;
 using Marion.ApiService.Infrastructure.Messaging;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -21,13 +26,21 @@ public sealed class MessagingRegistrationTests
             .Registrations;
         var messagingRegistration = Assert.Single(
             registrations,
-            registration => registration.Name == "Azure_ServiceBusClient");
+            registration => registration.Name
+                == MessagingServiceCollectionExtensions.ServiceBusHealthCheckName);
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ServiceBusClient>());
         Assert.IsType<AzureServiceBusPlatformIntegrationPublisher>(
             scope.ServiceProvider.GetRequiredService<IPlatformIntegrationPublisher>());
         Assert.DoesNotContain("live", messagingRegistration.Tags);
         Assert.Equal(HealthStatus.Unhealthy, messagingRegistration.FailureStatus);
+        Assert.Equal(
+            MessagingServiceCollectionExtensions.HealthCheckRegistrationTimeout,
+            messagingRegistration.Timeout);
+        Assert.True(
+            messagingRegistration.Timeout
+                > MessagingServiceCollectionExtensions.ConnectivityTimeout);
+        Assert.Single(scope.ServiceProvider.GetServices<ServiceBusClient>());
     }
 
     [Fact]
@@ -45,8 +58,132 @@ public sealed class MessagingRegistrationTests
             registrations,
             registration => registration.Name == "Azure_ServiceBusClient");
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ServiceBusClient>());
+        Assert.Single(scope.ServiceProvider.GetServices<ServiceBusClient>());
         Assert.NotNull(
             scope.ServiceProvider.GetRequiredService<IPlatformIntegrationPublisher>());
+    }
+
+    [Fact]
+    public void Local_mode_uses_the_named_emulator_connection()
+    {
+        using var host = BuildHost(
+            new Dictionary<string, string?>
+            {
+                [$"{PlatformOptions.SectionName}:Mode"] = "Local",
+                [$"{PlatformOptions.SectionName}:Local:BlobServiceUri"] =
+                    "https://storage.local",
+                [$"{PlatformOptions.SectionName}:Local:BlobContainerName"] = "documents",
+                [$"{PlatformOptions.SectionName}:Local:ServiceBusFullyQualifiedNamespace"] =
+                    "sbemulatorns",
+                [$"{PlatformOptions.SectionName}:Local:SqlConnectionName"] = "mariondb",
+                ["ConnectionStrings:messaging"] =
+                    "Endpoint=sb://emulator.local:5672/;"
+                    + "SharedAccessKeyName=RootManageSharedAccessKey;"
+                    + "SharedAccessKey=SAS_KEY_VALUE;"
+                    + "UseDevelopmentEmulator=true"
+            });
+
+        var client = host.Services.GetRequiredService<ServiceBusClient>();
+
+        Assert.Equal("emulator.local", client.FullyQualifiedNamespace);
+        Assert.Empty(host.Services.GetServices<TokenCredential>());
+    }
+
+    [Fact]
+    public void Azure_mode_uses_the_explicit_namespace_and_shared_token_credential()
+    {
+        using var host = BuildHost(
+            new Dictionary<string, string?>
+            {
+                [$"{PlatformOptions.SectionName}:Mode"] = "Azure",
+                [$"{PlatformOptions.SectionName}:Azure:BlobServiceUri"] =
+                    "https://documents.blob.core.windows.net",
+                [$"{PlatformOptions.SectionName}:Azure:BlobContainerName"] = "documents",
+                [$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+                    "explicit.servicebus.windows.net",
+                [$"{PlatformOptions.SectionName}:Azure:SqlServer"] =
+                    "marion.database.windows.net",
+                [$"{PlatformOptions.SectionName}:Azure:SqlDatabase"] = "marion",
+                [$"{PlatformOptions.SectionName}:Azure:Identity:TenantId"] = "tenant-id",
+                ["ConnectionStrings:messaging"] =
+                    "Endpoint=sb://sas-fallback.servicebus.windows.net/;"
+                    + "SharedAccessKeyName=not-used;"
+                    + "SharedAccessKey=not-used"
+            });
+
+        var tokenCredential = host.Services.GetRequiredService<TokenCredential>();
+        var client = host.Services.GetRequiredService<ServiceBusClient>();
+
+        Assert.Same(
+            host.Services.GetRequiredService<ManagedIdentityCredential>(),
+            tokenCredential);
+        Assert.Null(host.Services.GetService<DefaultAzureCredential>());
+        Assert.Equal("explicit.servicebus.windows.net", client.FullyQualifiedNamespace);
+    }
+
+    [Theory]
+    [InlineData("Local")]
+    [InlineData("Azure")]
+    public void Composition_registers_exactly_one_unkeyed_Service_Bus_client(
+        string platformMode)
+    {
+        var builder = CreateBuilder(
+            new Dictionary<string, string?>
+            {
+                [$"{PlatformOptions.SectionName}:Mode"] = platformMode,
+                [$"{PlatformOptions.SectionName}:Local:ServiceBusFullyQualifiedNamespace"] =
+                    "sbemulatorns",
+                [$"{PlatformOptions.SectionName}:Azure:ServiceBusFullyQualifiedNamespace"] =
+                    "explicit.servicebus.windows.net",
+                [$"{PlatformOptions.SectionName}:Azure:Identity:TenantId"] = "tenant-id",
+                ["ConnectionStrings:messaging"] =
+                    "Endpoint=sb://emulator.local:5672/;"
+                    + "SharedAccessKeyName=RootManageSharedAccessKey;"
+                    + "SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true"
+            });
+
+        var descriptors = builder.Services
+            .Where(descriptor =>
+                descriptor.ServiceType == typeof(ServiceBusClient)
+                && descriptor.ServiceKey is null)
+            .ToArray();
+
+        Assert.Single(descriptors);
+        Assert.Null(descriptors[0].ServiceKey);
+        using var host = builder.Build();
+    }
+
+    [Fact]
+    public async Task Connectivity_failure_is_bounded_and_does_not_expose_endpoint_details()
+    {
+        await using var client = new ServiceBusClient(
+            "Endpoint=sb://127.0.0.1:1/;"
+            + "SharedAccessKeyName=RootManageSharedAccessKey;"
+            + "SharedAccessKey=SAS_KEY_VALUE;"
+            + "UseDevelopmentEmulator=true",
+            new ServiceBusClientOptions
+            {
+                RetryOptions =
+                {
+                    MaxRetries = 0,
+                    TryTimeout = TimeSpan.FromMilliseconds(100)
+                }
+            });
+        var sender = client.CreateSender(
+            MessagingEntityNames.DocumentProcessingQueue);
+        var healthCheck = new ServiceBusConnectivityHealthCheck(
+            () => sender,
+            TimeSpan.FromSeconds(1),
+            new ServiceBusProbeTimer(TimeProvider.System));
+
+        var result = await healthCheck.CheckHealthAsync(
+            new HealthCheckContext(),
+            CancellationToken.None);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.DoesNotContain("127.0.0.1", result.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("SAS_KEY_VALUE", result.Description, StringComparison.Ordinal);
+        Assert.Null(result.Exception);
     }
 
     [Fact]
@@ -62,5 +199,20 @@ public sealed class MessagingRegistrationTests
         Assert.Equal(32, envelope.CorrelationId.Length);
         Assert.NotEqual(envelope.MessageId, envelope.CorrelationId);
         Assert.Equal(timestamp.ToUniversalTime(), envelope.OccurredAtUtc);
+    }
+
+    private static WebApplication BuildHost(IReadOnlyDictionary<string, string?> settings)
+    {
+        return CreateBuilder(settings).Build();
+    }
+
+    private static WebApplicationBuilder CreateBuilder(
+        IReadOnlyDictionary<string, string?> settings)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(settings);
+        builder.AddPlatformConfiguration();
+        builder.AddPlatformIntegrationPublisher();
+        return builder;
     }
 }
