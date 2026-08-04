@@ -213,13 +213,14 @@ public sealed class PlatformConfigurationTests
         }
     }
 
-    [Fact]
-    public void Azure_mode_rejects_Service_Bus_namespace_boundary_whitespace()
+    [Theory]
+    [InlineData(" messaging.servicebus.windows.net")]
+    [InlineData("messaging.servicebus.windows.net ")]
+    public void Azure_mode_rejects_Service_Bus_namespace_boundary_whitespace(
+        string fullyQualifiedNamespace)
     {
         const string settingName =
             "Marion:Platform:Azure:ServiceBusFullyQualifiedNamespace";
-        const string fullyQualifiedNamespace =
-            " messaging.servicebus.windows.net ";
         var settings = CreateAzureSettings(
             "https://documents.blob.core.windows.net");
         settings[settingName] = fullyQualifiedNamespace;
