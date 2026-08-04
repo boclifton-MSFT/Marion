@@ -30,6 +30,9 @@ public sealed class MessagingRegistrationTests
                 == MessagingServiceCollectionExtensions.ServiceBusHealthCheckName);
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ServiceBusClient>());
+        var sender = scope.ServiceProvider.GetRequiredService<ServiceBusSender>();
+        Assert.Same(sender, scope.ServiceProvider.GetRequiredService<ServiceBusSender>());
+        Assert.Equal(MessagingEntityNames.DocumentProcessingQueue, sender.EntityPath);
         Assert.IsType<AzureServiceBusPlatformIntegrationPublisher>(
             scope.ServiceProvider.GetRequiredService<IPlatformIntegrationPublisher>());
         Assert.DoesNotContain("live", messagingRegistration.Tags);
@@ -131,7 +134,9 @@ public sealed class MessagingRegistrationTests
                     TryTimeout = TimeSpan.FromMilliseconds(100)
                 }
             });
-        var healthCheck = new ServiceBusConnectivityHealthCheck(client);
+        await using var sender = client.CreateSender(
+            MessagingEntityNames.DocumentProcessingQueue);
+        var healthCheck = new ServiceBusConnectivityHealthCheck(sender);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
 
         var result = await healthCheck.CheckHealthAsync(
@@ -141,6 +146,7 @@ public sealed class MessagingRegistrationTests
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
         Assert.DoesNotContain("127.0.0.1", result.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("SAS_KEY_VALUE", result.Description, StringComparison.Ordinal);
+        Assert.Null(result.Exception);
     }
 
     [Fact]

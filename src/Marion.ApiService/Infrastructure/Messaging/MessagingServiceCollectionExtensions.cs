@@ -21,6 +21,10 @@ internal static class MessagingServiceCollectionExtensions
     {
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<ServiceBusClient>(CreateServiceBusClient);
+        services.AddSingleton(serviceProvider =>
+            serviceProvider
+                .GetRequiredService<ServiceBusClient>()
+                .CreateSender(MessagingEntityNames.DocumentProcessingQueue));
         services.TryAddSingleton<IPlatformIntegrationPublisher,
             AzureServiceBusPlatformIntegrationPublisher>();
         services.PostConfigure<HealthCheckServiceOptions>(ConfigureHealthCheck);
@@ -100,7 +104,7 @@ internal static class MessagingServiceCollectionExtensions
             ServiceBusHealthCheckName,
             new Func<IServiceProvider, IHealthCheck>(serviceProvider =>
                 new ServiceBusConnectivityHealthCheck(
-                    serviceProvider.GetRequiredService<ServiceBusClient>())),
+                    serviceProvider.GetRequiredService<ServiceBusSender>())),
             HealthStatus.Unhealthy,
             registration.Tags,
             ConnectivityTimeout));
