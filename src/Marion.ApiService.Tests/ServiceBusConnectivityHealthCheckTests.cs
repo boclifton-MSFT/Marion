@@ -300,8 +300,9 @@ public sealed class ServiceBusConnectivityHealthCheckTests
             new HealthCheckContext(),
             cancellation.Token);
         await sender.BatchStarted.Task;
-        cancellation.Cancel();
+        lateOperation.SetResult(lateBatch);
         await sender.DisposeStarted.Task;
+        cancellation.Cancel();
 
         var exception = await Assert.ThrowsAsync<OperationCanceledException>(
             () => checkTask);
@@ -309,7 +310,6 @@ public sealed class ServiceBusConnectivityHealthCheckTests
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         Assert.Equal(1, sender.DisposeCount);
 
-        lateOperation.SetResult(lateBatch);
         await sender.OperationSettled.Task;
         stalledDisposal.SetResult(null);
         await healthCheck.WaitForPendingCleanupAsync();
